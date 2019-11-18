@@ -1,4 +1,6 @@
-﻿open System
+﻿module Trafc
+
+open System.IO
 
 exception CommandLineParserError of string
 
@@ -33,12 +35,19 @@ let parseCmdLine (argv : string list) : string list * string =
 
     (List.rev inputs, output)
 
+let compile inputs output =
+    let driver = Drive.createDriver()
+    for input in inputs do
+        let source = File.ReadAllText input
+        Drive.addSource driver source
+    let binary = Drive.getExe driver
+    File.WriteAllBytes(output, binary)
+
 [<EntryPoint>]
 let main argv =
     try
         let (inputs, output) = parseCmdLine (List.ofArray argv)
-        printfn "Inputs: %O" inputs
-        printfn "Output: %s" output
+        compile inputs output
         0
     with
         | CommandLineParserError msg ->

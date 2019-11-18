@@ -5,6 +5,8 @@ VisualStudioVersion = 16.0.29509.3
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "trafc", "trafc\trafc.fsproj", "{0C0EDE5D-7600-4999-A2E8-26917C694788}"
 EndProject
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "trafc.Tests", "trafc.Tests\trafc.Tests.fsproj", "{DFE52023-1D4B-4FF8-8547-72399B068AD8}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -15,6 +17,10 @@ Global
 		{0C0EDE5D-7600-4999-A2E8-26917C694788}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{0C0EDE5D-7600-4999-A2E8-26917C694788}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{0C0EDE5D-7600-4999-A2E8-26917C694788}.Release|Any CPU.Build.0 = Release|Any CPU
+		{DFE52023-1D4B-4FF8-8547-72399B068AD8}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{DFE52023-1D4B-4FF8-8547-72399B068AD8}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{DFE52023-1D4B-4FF8-8547-72399B068AD8}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{DFE52023-1D4B-4FF8-8547-72399B068AD8}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
