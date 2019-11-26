@@ -1,4 +1,4 @@
-﻿module Trafc
+﻿module Triton.Trafc
 
 open System.IO
 
@@ -36,11 +36,11 @@ let parseCmdLine (argv : string list) : string list * string =
     (List.rev inputs, output)
 
 let compile inputs output =
-    let driver = Drive.createDriver()
+    let driver = Driver.createDriver()
     for input in inputs do
         let source = File.ReadAllText input
-        Drive.addSource driver source
-    let binary = Drive.getExe driver
+        Driver.addSource driver input source
+    let binary = Driver.getExe driver
     File.WriteAllBytes(output, binary)
 
 [<EntryPoint>]
