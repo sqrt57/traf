@@ -1,4 +1,4 @@
-﻿module Triton.Trafc
+module Triton.Trafc
 
 open System.IO
 
@@ -55,4 +55,7 @@ let main argv =
             eprintfn ""
             eprintfn "Usage:"
             eprintfn "  trafc -o output input1 [input2] ..."
+            1
+        | Lexer.LexerError err ->
+            eprintfn "Error while lexing %s: %s" err.fileName err.message
             1
