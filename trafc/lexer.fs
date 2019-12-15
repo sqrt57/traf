@@ -10,6 +10,15 @@ module LexemeModule =
         | Identifier of string
         | LeftCurly
         | RightCurly
+        | LeftBracket
+        | RightBracket
+        | LeftSquare
+        | RightSquare
+        | Dot
+        | Comma
+        | Semicolon
+        | Caret
+        | AtSign
 
 module Lexer =
 
@@ -24,6 +33,15 @@ module Lexer =
     let singleCharTokens = readOnlyDict [
         '{', Lexeme.LeftCurly
         '}', Lexeme.RightCurly
+        '(', Lexeme.LeftBracket
+        ')', Lexeme.RightBracket
+        '[', Lexeme.LeftSquare
+        ']', Lexeme.RightSquare
+        '.', Lexeme.Dot
+        ',', Lexeme.Comma
+        ';', Lexeme.Semicolon
+        '^', Lexeme.Caret
+        '@', Lexeme.AtSign
     ]
 
     let lex (fileName : string) (source : string) : Lexeme array =

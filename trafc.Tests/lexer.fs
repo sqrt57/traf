@@ -38,5 +38,12 @@ let ``Lex identifier with left and right curly brackets`` () =
     test <@ [| Lexeme.Identifier "abc"; Lexeme.LeftCurly; Lexeme.RightCurly |] = Lexer.lex "" "abc{}" @>
 
 [<Fact>]
+let ``Lex single chars`` () =
+    test <@ [| Lexeme.LeftCurly; Lexeme.RightCurly; Lexeme.LeftBracket; Lexeme.RightBracket
+               Lexeme.LeftSquare; Lexeme.RightSquare; Lexeme.Dot; Lexeme.Comma
+               Lexeme.Semicolon; Lexeme.Caret; Lexeme.AtSign
+            |] = Lexer.lex "" "{}()[].,;^@" @>
+
+[<Fact>]
 let ``When lexing incorrect character then get error`` () =
-    raises<Lexer.LexerError> <@ Lexer.lex "" "@" @>
+    raises<Lexer.LexerError> <@ Lexer.lex "" "~" @>
