@@ -5,11 +5,11 @@ open System
 [<AutoOpen>]
 module LexemeModule =
 
-    type Lexeme = private Identifier of string
-
-    module Lexeme =
-
-        let identifier name = Identifier name
+    [<RequireQualifiedAccess>]
+    type Lexeme =
+        | Identifier of string
+        | LeftCurly
+        | RightCurly
 
 module Lexer =
 
@@ -21,6 +21,11 @@ module Lexer =
 
     let private isWhite (c : char) = Char.IsWhiteSpace c
 
+    let singleCharTokens = readOnlyDict [
+        '{', Lexeme.LeftCurly
+        '}', Lexeme.RightCurly
+    ]
+
     let lex (fileName : string) (source : string) : Lexeme array =
         let result = ResizeArray<Lexeme>()
 
@@ -31,6 +36,9 @@ module Lexer =
                     processChar (i + 1)
                 else if isIdentStart c then
                     processIdentifier i (i + 1)
+                else if singleCharTokens.ContainsKey c then
+                    singleCharTokens.Item c |> result.Add
+                    processChar (i + 1)
                 else raise <| LexerError {| fileName = fileName; message = sprintf "invalid char: %c" c |}
             else
                 ()
@@ -41,10 +49,10 @@ module Lexer =
                 if isIdent c then
                     processIdentifier start (i + 1)
                 else
-                    source.Substring(start, i - start) |> Lexeme.identifier |> result.Add
+                    source.Substring(start, i - start) |> Lexeme.Identifier |> result.Add
                     processChar i
             else
-                source.Substring(start) |> Lexeme.identifier |> result.Add
+                source.Substring(start) |> Lexeme.Identifier |> result.Add
                 ()
 
         processChar 0
