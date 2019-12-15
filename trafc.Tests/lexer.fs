@@ -14,6 +14,10 @@ let ``Lex whitespace`` () =
     test <@ [||] = Lexer.lex "" "  " @>
 
 [<Fact>]
+let ``When lexing incorrect character then raise error`` () =
+    raises<Lexer.LexerError> <@ Lexer.lex "" "~" @>
+
+[<Fact>]
 let ``Lex identifier`` () =
     test <@ [|Lexeme.Identifier "abc"|] = Lexer.lex "" "abc" @>
 
@@ -45,5 +49,67 @@ let ``Lex single chars`` () =
             |] = Lexer.lex "" "{}()[].,;^@" @>
 
 [<Fact>]
-let ``When lexing incorrect character then get error`` () =
-    raises<Lexer.LexerError> <@ Lexer.lex "" "~" @>
+let ``Lex empty string literal`` () =
+    test <@ [| Lexeme.StringLiteral "" |] = Lexer.lex "" "\"\"" @>
+
+[<Fact>]
+let ``Lex string literal`` () =
+    test <@ [| Lexeme.StringLiteral "abc" |] = Lexer.lex "" "\"abc\"" @>
+
+[<Fact>]
+let ``Lex string literal with newlines`` () =
+    test <@ [| Lexeme.StringLiteral "\n \n" |] = Lexer.lex "" "\"\n \\n\"" @>
+
+[<Fact>]
+let ``Lex string literal with tabs`` () =
+    test <@ [| Lexeme.StringLiteral "\t \t" |] = Lexer.lex "" "\"\t \\t\"" @>
+
+[<Fact>]
+let ``Lex string literal with apostrophes`` () =
+    test <@ [| Lexeme.StringLiteral "' '" |] = Lexer.lex "" "\"' \\'\"" @>
+
+[<Fact>]
+let ``Lex string literal with quotes`` () =
+    test <@ [| Lexeme.StringLiteral "\"" |] = Lexer.lex "" "\"\\\"\"" @>
+
+[<Fact>]
+let ``When lexing unclosed string literal then get error`` () =
+    raises<Lexer.LexerError> <@ Lexer.lex "" "\"" @>
+
+[<Fact>]
+let ``When lexing string literal with bad escape sequence then get error`` () =
+    raises<Lexer.LexerError> <@ Lexer.lex "" "\"\\g\"" @>
+
+[<Fact>]
+let ``Lex char literal`` () =
+    test <@ [| Lexeme.CharLiteral 'x' |] = Lexer.lex "" "'x'" @>
+
+[<Fact>]
+let ``Lex char literal with newline`` () =
+    test <@ [| Lexeme.CharLiteral '\n'; Lexeme.CharLiteral '\n' |] = Lexer.lex "" "'\n' '\\n'" @>
+
+[<Fact>]
+let ``Lex char literal with tab`` () =
+    test <@ [| Lexeme.CharLiteral '\t'; Lexeme.CharLiteral '\t' |] = Lexer.lex "" "'\t' '\\t'" @>
+
+[<Fact>]
+let ``Lex char literal with apostrophe`` () =
+    test <@ [| Lexeme.CharLiteral '\'' |] = Lexer.lex "" "'\\''" @>
+
+[<Fact>]
+let ``Lex char literal with quote`` () =
+    test <@ [| Lexeme.CharLiteral '\"'; Lexeme.CharLiteral '\"' |] = Lexer.lex "" "'\"' '\\\"'" @>
+
+[<Fact>]
+let ``When lexing empty char literal then get error`` () =
+    raises<Lexer.LexerError> <@ Lexer.lex "" "''" @>
+
+[<Fact>]
+let ``When lexing unclosed char literal then get error`` () =
+    raises<Lexer.LexerError> <@ Lexer.lex "" "'" @>
+    raises<Lexer.LexerError> <@ Lexer.lex "" "'x" @>
+    raises<Lexer.LexerError> <@ Lexer.lex "" "'x " @>
+
+[<Fact>]
+let ``When lexing char literal with bad escape sequence then get error`` () =
+    raises<Lexer.LexerError> <@ Lexer.lex "" "'\\g'" @>
