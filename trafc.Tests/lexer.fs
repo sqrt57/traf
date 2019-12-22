@@ -18,6 +18,31 @@ let ``When lexing incorrect character then raise error`` () =
     raises<Lexer.LexerError> <@ Lexer.lex "" "~" @>
 
 [<Fact>]
+let ``Lex line comment`` () =
+    test <@ [|Lexeme.Identifier "abc"; Lexeme.Identifier "def" |] = Lexer.lex "" "abc//xyz\ndef" @>
+    test <@ [|Lexeme.Identifier "abc"; Lexeme.Identifier "def" |] = Lexer.lex "" "abc//\ndef" @>
+    test <@ [|Lexeme.Identifier "abc"; Lexeme.Identifier "def" |] = Lexer.lex "" "abc//x/*y*/z\ndef" @>
+    test <@ [|Lexeme.Identifier "abc"|] = Lexer.lex "" "abc//xyz" @>
+    test <@ [|Lexeme.Identifier "abc"|] = Lexer.lex "" "abc//" @>
+
+[<Fact>]
+let ``Lex comment`` () =
+    test <@ [|Lexeme.Identifier "abc"; Lexeme.Identifier "def" |] = Lexer.lex "" "abc/*xyz*/def" @>
+    test <@ [|Lexeme.Identifier "abc"; Lexeme.Identifier "def" |] = Lexer.lex "" "abc/**/def" @>
+    test <@ [|Lexeme.Identifier "abc"; Lexeme.Identifier "def" |] = Lexer.lex "" "abc/*//\n*/def" @>
+    test <@ [|Lexeme.Identifier "abc"; Lexeme.Identifier "def" |] = Lexer.lex "" "abc/*// */def" @>
+    test <@ [|Lexeme.Identifier "abc"|] = Lexer.lex "" "abc/*xyz*/" @>
+
+[<Fact>]
+let ``Lex nested comment`` () =
+    test <@ [|Lexeme.Identifier "abc"; Lexeme.Identifier "def" |] = Lexer.lex "" "abc/*x/*y*/*/def" @>
+    test <@ [|Lexeme.Identifier "abc"; Lexeme.Identifier "def" |] = Lexer.lex "" "abc/*/**/*/def" @>
+
+[<Fact>]
+let ``When lexing unclosed comment then raise error`` () =
+    raises<Lexer.LexerError> <@ Lexer.lex "" "/*" @>
+
+[<Fact>]
 let ``Lex identifier`` () =
     test <@ [|Lexeme.Identifier "abc"|] = Lexer.lex "" "abc" @>
 

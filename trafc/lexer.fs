@@ -73,9 +73,49 @@ module Lexer =
                     processStringLiteral i
                 else if c = '\'' then
                     processCharLiteral i
-                else raise <| LexerError {| fileName = fileName; message = sprintf "invalid char: %c" c |}
+                else if c = '/' then
+                    if i + 1 < source.Length then
+                        let c1 = source.[i+1]
+                        if c1 = '/' then
+                            processLineComment (i + 2)
+                        else if c1 = '*' then
+                            processComment (i + 2)
+                        else
+                            raise <| LexerError {| fileName = fileName; message = sprintf "invalid character sequence: '%s'" (source.Substring(i, 2)) |}
+                    else
+                        raise <| LexerError {| fileName = fileName; message = sprintf "invalid character sequence: '%s'" (source.Substring(i, 2)) |}
+                else
+                    raise <| LexerError {| fileName = fileName; message = sprintf "invalid char: %c" c |}
             else
                 ()
+
+        and processLineComment i =
+            if i < source.Length then
+                let c = source.[i]
+                if c = '\n' then
+                    processChar (i + 1)
+                else
+                    processLineComment (i + 1)
+            else
+                ()
+
+        and processComment i =
+            let rec processCommentInner level prev i =
+                if i < source.Length then
+                    let c = source.[i]
+                    if prev = '/' && c = '*' then
+                        processCommentInner (level + 1) ' ' (i + 1)
+                    else if prev = '*' && c = '/' then
+                        if level > 1 then
+                            processCommentInner (level - 1) ' ' (i + 1)
+                        else
+                            processChar (i + 1)
+                    else
+                        processCommentInner level c (i + 1)
+                else
+                    raise <| LexerError {| fileName = fileName; message = "comment close expected but got EOF" |}
+
+            processCommentInner 1 ' ' i
 
         and processIdentifier start =
             let rec processIdentifierInner i =
