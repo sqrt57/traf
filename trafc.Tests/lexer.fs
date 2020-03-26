@@ -138,3 +138,8 @@ let ``When lexing unclosed char literal then get error`` () =
 [<Fact>]
 let ``When lexing char literal with bad escape sequence then get error`` () =
     raises<Lexer.LexerError> <@ Lexer.lex "" "'\\g'" @>
+
+[<Fact>]
+let ``Lex number literal`` () =
+    test <@ [| Lexeme.Int 0L |] = Lexer.lex "" "0" @>
+

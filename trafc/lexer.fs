@@ -11,6 +11,7 @@ module LexemeModule =
         | Identifier of string
         | StringLiteral of string
         | CharLiteral of char
+        | Int of int64
         | LeftCurly
         | RightCurly
         | LeftBracket
@@ -56,6 +57,19 @@ module Lexer =
         '0', '\u0000'
     ]
 
+    let decimalDigits = readOnlyDict [
+        '0', 0L
+        '1', 1L
+        '2', 2L
+        '3', 3L
+        '4', 4L
+        '5', 5L
+        '6', 6L
+        '7', 7L
+        '8', 8L
+        '9', 9L
+    ]
+
     let lex (fileName : string) (source : string) : Lexeme array =
         let result = ResizeArray<Lexeme>()
 
@@ -69,6 +83,8 @@ module Lexer =
                 else if singleCharTokens.ContainsKey c then
                     singleCharTokens.Item c |> result.Add
                     processChar (i + 1)
+                else if decimalDigits.ContainsKey c then
+                    processNumericalLiteral i
                 else if c = '"' then
                     processStringLiteral i
                 else if c = '\'' then
@@ -188,6 +204,26 @@ module Lexer =
                     charLiteralCheckClose start (start + 2)
             else
                 raise <| LexerError {| fileName = fileName; message = sprintf "unexpected EOF in char literal: %s" (source.Substring start) |}
+
+        and processNumericalLiteral start =
+            let doneNumericalLiteral i acc =
+                acc |> Lexeme.Int |> result.Add
+                processChar i
+
+            let rec processNumericalLiteralInner i acc =
+                if i < source.Length then
+                    let c = source.[i]
+                    if decimalDigits.ContainsKey c then
+                        let digit = decimalDigits.Item c
+                        processNumericalLiteralInner (i + 1) (acc * 10L + digit)
+                    else if isIdentStart c then
+                        raise <| LexerError {| fileName = fileName; message = sprintf "unexpected char %c in numerical literal: '%s'" c (source.Substring(start, i + 1 - start)) |}
+                    else
+                        doneNumericalLiteral i acc
+                else
+                    doneNumericalLiteral i acc
+
+            processNumericalLiteralInner start 0L
 
         processChar 0
 
