@@ -85,6 +85,8 @@ module Lexer =
                     processChar (i + 1)
                 else if decimalDigits.ContainsKey c then
                     processNumericalLiteral i
+                else if c = '-' then
+                    processNumericalLiteral i
                 else if c = '"' then
                     processStringLiteral i
                 else if c = '\'' then
@@ -206,24 +208,30 @@ module Lexer =
                 raise <| LexerError {| fileName = fileName; message = sprintf "unexpected EOF in char literal: %s" (source.Substring start) |}
 
         and processNumericalLiteral start =
-            let doneNumericalLiteral i acc =
-                acc |> Lexeme.Int |> result.Add
+            let doneNumericalLiteral i acc negative =
+                let value = if negative then -acc else acc
+                value |> Lexeme.Int |> result.Add
                 processChar i
 
-            let rec processNumericalLiteralInner i acc =
+            let rec processNumericalLiteralInner i acc negative =
                 if i < source.Length then
                     let c = source.[i]
                     if decimalDigits.ContainsKey c then
                         let digit = decimalDigits.Item c
-                        processNumericalLiteralInner (i + 1) (acc * 10L + digit)
+                        processNumericalLiteralInner (i + 1) (acc * 10L + digit) negative
                     else if isIdentStart c then
                         raise <| LexerError {| fileName = fileName; message = sprintf "unexpected char %c in numerical literal: '%s'" c (source.Substring(start, i + 1 - start)) |}
                     else
-                        doneNumericalLiteral i acc
+                        doneNumericalLiteral i acc negative
                 else
-                    doneNumericalLiteral i acc
+                    doneNumericalLiteral i acc negative
 
-            processNumericalLiteralInner start 0L
+            let c = source.[start]
+
+            if c = '-' then
+                processNumericalLiteralInner (start + 1) 0L true
+            else
+                processNumericalLiteralInner start 0L false
 
         processChar 0
 

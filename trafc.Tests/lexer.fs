@@ -140,6 +140,13 @@ let ``When lexing char literal with bad escape sequence then get error`` () =
     raises<Lexer.LexerError> <@ Lexer.lex "" "'\\g'" @>
 
 [<Fact>]
-let ``Lex number literal`` () =
+let ``Lex zero number literal`` () =
     test <@ [| Lexeme.Int 0L |] = Lexer.lex "" "0" @>
 
+[<Fact>]
+let ``Lex positive number literal`` () =
+    test <@ [| Lexeme.Int 1L; Lexeme.Int 23L |] = Lexer.lex "" "1 23" @>
+
+[<Fact>]
+let ``Lex negative number literal`` () =
+    test <@ [| Lexeme.Int 0L; Lexeme.Int -1L; Lexeme.Int -23L |] = Lexer.lex "" "-0 -1 -23" @>
