@@ -2,6 +2,7 @@ namespace Triton
 
 open System
 open System.Text
+open System.Collections.Generic
 
 [<AutoOpen>]
 module LexemeModule =
@@ -68,6 +69,25 @@ module Lexer =
         '7', 7L
         '8', 8L
         '9', 9L
+    ]
+
+    let hexadecimalDigits = readOnlyDict [
+        '0', 0L
+        '1', 1L
+        '2', 2L
+        '3', 3L
+        '4', 4L
+        '5', 5L
+        '6', 6L
+        '7', 7L
+        '8', 8L
+        '9', 9L
+        'a', 10L; 'A', 10L
+        'b', 11L; 'B', 11L
+        'c', 12L; 'C', 12L
+        'd', 13L; 'D', 13L
+        'e', 14L; 'E', 14L
+        'f', 15L; 'F', 15L
     ]
 
     let lex (fileName : string) (source : string) : Lexeme array =
@@ -213,14 +233,14 @@ module Lexer =
                 value |> Lexeme.Int |> result.Add
                 processChar i
 
-            let rec processNumericalLiteralInner i acc expectDigit negative =
+            let rec processNumericalLiteralInner (digits: IReadOnlyDictionary<char, int64>) radix i acc expectDigit negative =
                 if i < source.Length then
                     let c = source.[i]
                     if c = '_' then
-                        processNumericalLiteralInner (i + 1) acc true negative
-                    elif decimalDigits.ContainsKey c then
-                        let digit = decimalDigits.Item c
-                        processNumericalLiteralInner (i + 1) (acc * 10L + digit) false negative
+                        processNumericalLiteralInner digits radix (i + 1) acc true negative
+                    elif digits.ContainsKey c then
+                        let digit = digits.Item c
+                        processNumericalLiteralInner digits radix (i + 1) (acc * radix + digit) false negative
                     elif isIdentStart c then
                         raise <| LexerError {| fileName = fileName; message = sprintf "unexpected char %c in numerical literal: '%s'" c (source.Substring(start, i + 1 - start)) |}
                     else
@@ -232,12 +252,29 @@ module Lexer =
                         raise <| LexerError {| fileName = fileName; message = sprintf "expected digit in numerical literal: '%s', but got EOF" (source.Substring(start, i - start)) |}
                     doneNumericalLiteral i acc negative
 
+            let dispatchRadix i negative =
+                if i < source.Length then
+                    let c = source.[i]
+                    if c = '0' then
+                        if i + 1 < source.Length then
+                            let c1 = source.[i + 1]
+                            if c1 = 'x' || c1 = 'X' then
+                                processNumericalLiteralInner hexadecimalDigits 16L (i + 2) 0L true negative
+                            else
+                                processNumericalLiteralInner decimalDigits 10L i 0L true negative
+                        else
+                            doneNumericalLiteral (i + 1) 0L negative
+                    else
+                        processNumericalLiteralInner decimalDigits 10L i 0L true negative
+                else
+                    raise <| LexerError {| fileName = fileName; message = sprintf "expected digit in numerical literal: '%s', but got EOF" (source.Substring(start, i - start)) |}
+
             let c = source.[start]
 
             if c = '-' then
-                processNumericalLiteralInner (start + 1) 0L true true
+                dispatchRadix (start + 1) true
             else
-                processNumericalLiteralInner start 0L true false
+                dispatchRadix start false
 
         processChar 0
 
