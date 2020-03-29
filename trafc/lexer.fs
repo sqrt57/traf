@@ -213,25 +213,31 @@ module Lexer =
                 value |> Lexeme.Int |> result.Add
                 processChar i
 
-            let rec processNumericalLiteralInner i acc negative =
+            let rec processNumericalLiteralInner i acc expectDigit negative =
                 if i < source.Length then
                     let c = source.[i]
-                    if decimalDigits.ContainsKey c then
+                    if c = '_' then
+                        processNumericalLiteralInner (i + 1) acc true negative
+                    elif decimalDigits.ContainsKey c then
                         let digit = decimalDigits.Item c
-                        processNumericalLiteralInner (i + 1) (acc * 10L + digit) negative
-                    else if isIdentStart c then
+                        processNumericalLiteralInner (i + 1) (acc * 10L + digit) false negative
+                    elif isIdentStart c then
                         raise <| LexerError {| fileName = fileName; message = sprintf "unexpected char %c in numerical literal: '%s'" c (source.Substring(start, i + 1 - start)) |}
                     else
+                        if expectDigit then
+                            raise <| LexerError {| fileName = fileName; message = sprintf "expected digit in numerical literal: '%s'" (source.Substring(start, i + 1 - start)) |}
                         doneNumericalLiteral i acc negative
                 else
+                    if expectDigit then
+                        raise <| LexerError {| fileName = fileName; message = sprintf "expected digit in numerical literal: '%s', but got EOF" (source.Substring(start, i - start)) |}
                     doneNumericalLiteral i acc negative
 
             let c = source.[start]
 
             if c = '-' then
-                processNumericalLiteralInner (start + 1) 0L true
+                processNumericalLiteralInner (start + 1) 0L true true
             else
-                processNumericalLiteralInner start 0L false
+                processNumericalLiteralInner start 0L true false
 
         processChar 0
 

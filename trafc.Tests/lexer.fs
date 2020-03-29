@@ -150,3 +150,7 @@ let ``Lex positive number literal`` () =
 [<Fact>]
 let ``Lex negative number literal`` () =
     test <@ [| Lexeme.Int 0L; Lexeme.Int -1L; Lexeme.Int -23L |] = Lexer.lex "" "-0 -1 -23" @>
+
+[<Fact>]
+let ``Lex number literal with underscore`` () =
+    test <@ [| Lexeme.Int 11L; Lexeme.Int 12L |] = Lexer.lex "" "1__1 0_1_2" @>
