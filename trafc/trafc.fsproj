@@ -7,6 +7,7 @@
 
   <ItemGroup>
     <Compile Include="lexer.fs" />
+    <Compile Include="parser.fs" />
     <Compile Include="driver.fs" />
     <Compile Include="trafc.fs" />
   </ItemGroup>
