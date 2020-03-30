@@ -36,7 +36,7 @@ module Lexer =
 
     let private isWhite (c : char) = Char.IsWhiteSpace c
 
-    let singleCharTokens = readOnlyDict [
+    let private singleCharTokens = readOnlyDict [
         '{', Lexeme.LeftCurly
         '}', Lexeme.RightCurly
         '(', Lexeme.LeftBracket
@@ -50,9 +50,9 @@ module Lexer =
         '@', Lexeme.AtSign
     ]
 
-    let operatorChars = set [ '+'; '-'; '*'; '/'; '%'; '<'; '>'; '='; '!'; ':'; '|' ]
+    let private operatorChars = set [ '+'; '-'; '*'; '/'; '%'; '<'; '>'; '='; '!'; ':'; '|' ]
 
-    let literalSpecialChars = readOnlyDict [
+    let private literalSpecialChars = readOnlyDict [
         '\\', '\\'
         'n', '\n'
         't', '\t'
@@ -61,7 +61,7 @@ module Lexer =
         '0', '\u0000'
     ]
 
-    let decimalDigits = readOnlyDict [
+    let private decimalDigits = readOnlyDict [
         '0', 0L
         '1', 1L
         '2', 2L
@@ -74,7 +74,7 @@ module Lexer =
         '9', 9L
     ]
 
-    let hexadecimalDigits = readOnlyDict [
+    let private hexadecimalDigits = readOnlyDict [
         '0', 0L
         '1', 1L
         '2', 2L
