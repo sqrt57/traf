@@ -28,7 +28,7 @@ module LexemeModule =
 
 module Lexer =
 
-    exception LexerError of {| fileName: string; message: string |}
+    exception LexerError of {| message: string |}
 
     let private isIdentStart (c : char) = Char.IsLetter c || c = '_'
 
@@ -154,7 +154,7 @@ module Lexer =
                     else
                         processCommentInner level c (i + 1)
                 else
-                    raise <| LexerError {| fileName = fileName; message = "comment close expected but got EOF" |}
+                    raise <| LexerError {| message = "comment close expected but got EOF" |}
 
             processCommentInner 1 ' ' i
 
@@ -202,14 +202,14 @@ module Lexer =
                                 literalSpecialChars.Item c1 |> literal.Append |> ignore
                                 processStringLiteralInner (i + 2)
                             else
-                                raise <| LexerError {| fileName = fileName; message = sprintf "unknow escape sequence in string literal: '%s'" (source.Substring(i, 2)) |}
+                                raise <| LexerError {| message = sprintf "unknow escape sequence in string literal: '%s'" (source.Substring(i, 2)) |}
                         else
-                            raise <| LexerError {| fileName = fileName; message = sprintf "unexpected EOF in string literal: %s" (source.Substring start) |}
+                            raise <| LexerError {| message = sprintf "unexpected EOF in string literal: %s" (source.Substring start) |}
                     else
                         literal.Append c |> ignore
                         processStringLiteralInner (i + 1)
                 else
-                    raise <| LexerError {| fileName = fileName; message = sprintf "unexpected EOF in string literal: %s" (source.Substring start) |}
+                    raise <| LexerError {| message = sprintf "unexpected EOF in string literal: %s" (source.Substring start) |}
 
             processStringLiteralInner (start + 1)
 
@@ -220,14 +220,14 @@ module Lexer =
                     if c = '\'' then
                         processChar (close+1)
                     else
-                        raise <| LexerError {| fileName = fileName; message = sprintf "expected closing apostrophe in char literal: %s" (source.Substring(start, (close-start+1))) |}
+                        raise <| LexerError {| message = sprintf "expected closing apostrophe in char literal: %s" (source.Substring(start, (close-start+1))) |}
                 else
-                    raise <| LexerError {| fileName = fileName; message = sprintf "unexpected EOF in char literal: %s" (source.Substring start) |}
+                    raise <| LexerError {| message = sprintf "unexpected EOF in char literal: %s" (source.Substring start) |}
 
             if start + 1 < source.Length then
                 let c = source.[start+1]
                 if c = '\'' then
-                    raise <| LexerError {| fileName = fileName; message = sprintf "empty char literal: '%s'" (source.Substring(start, 2)) |}
+                    raise <| LexerError {| message = sprintf "empty char literal: '%s'" (source.Substring(start, 2)) |}
                 else if c = '\\' then
                     if start + 2 < source.Length then
                         let c1 = source.[start+2]
@@ -235,14 +235,14 @@ module Lexer =
                             literalSpecialChars.Item c1 |> Lexeme.CharLiteral |> result.Add
                             charLiteralCheckClose start (start + 3)
                         else
-                            raise <| LexerError {| fileName = fileName; message = sprintf "unknown escape sequence in char literal: '%s'" (source.Substring(start, 3)) |}
+                            raise <| LexerError {| message = sprintf "unknown escape sequence in char literal: '%s'" (source.Substring(start, 3)) |}
                     else
-                        raise <| LexerError {| fileName = fileName; message = sprintf "unexpected EOF in char literal: %s" (source.Substring start) |}
+                        raise <| LexerError {| message = sprintf "unexpected EOF in char literal: %s" (source.Substring start) |}
                 else
                     c |> Lexeme.CharLiteral |> result.Add
                     charLiteralCheckClose start (start + 2)
             else
-                raise <| LexerError {| fileName = fileName; message = sprintf "unexpected EOF in char literal: %s" (source.Substring start) |}
+                raise <| LexerError {| message = sprintf "unexpected EOF in char literal: %s" (source.Substring start) |}
 
         and processNumericalLiteral start =
             let doneNumericalLiteral i acc negative =
@@ -259,14 +259,14 @@ module Lexer =
                         let digit = digits.Item c
                         processNumericalLiteralInner digits radix (i + 1) (acc * radix + digit) false negative
                     elif isIdentStart c then
-                        raise <| LexerError {| fileName = fileName; message = sprintf "unexpected char %c in numerical literal: '%s'" c (source.Substring(start, i + 1 - start)) |}
+                        raise <| LexerError {| message = sprintf "unexpected char %c in numerical literal: '%s'" c (source.Substring(start, i + 1 - start)) |}
                     else
                         if expectDigit then
-                            raise <| LexerError {| fileName = fileName; message = sprintf "expected digit in numerical literal: '%s'" (source.Substring(start, i + 1 - start)) |}
+                            raise <| LexerError {| message = sprintf "expected digit in numerical literal: '%s'" (source.Substring(start, i + 1 - start)) |}
                         doneNumericalLiteral i acc negative
                 else
                     if expectDigit then
-                        raise <| LexerError {| fileName = fileName; message = sprintf "expected digit in numerical literal: '%s', but got EOF" (source.Substring(start, i - start)) |}
+                        raise <| LexerError {| message = sprintf "expected digit in numerical literal: '%s', but got EOF" (source.Substring(start, i - start)) |}
                     doneNumericalLiteral i acc negative
 
             let dispatchRadix i negative =
@@ -284,7 +284,7 @@ module Lexer =
                     else
                         processNumericalLiteralInner decimalDigits 10L i 0L true negative
                 else
-                    raise <| LexerError {| fileName = fileName; message = sprintf "expected digit in numerical literal: '%s', but got EOF" (source.Substring(start, i - start)) |}
+                    raise <| LexerError {| message = sprintf "expected digit in numerical literal: '%s', but got EOF" (source.Substring(start, i - start)) |}
 
             let c = source.[start]
 

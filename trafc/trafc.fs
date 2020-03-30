@@ -57,5 +57,5 @@ let main argv =
             eprintfn "  trafc -o output input1 [input2] ..."
             1
         | Lexer.LexerError err ->
-            eprintfn "Error while lexing %s: %s" err.fileName err.message
+            eprintfn "Error while lexing: %s" err.message
             1
