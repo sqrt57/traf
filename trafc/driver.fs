@@ -9,7 +9,7 @@ module Driver =
 
     let addSource (driver : Driver) (filename : string) (source : string) : unit =
         printfn "Compiling source file \"%s\"" filename
-        let tokens = Lexer.lex filename source
+        let tokens = Lexer.lex source
         for token in tokens do
             printfn "%O" token
 

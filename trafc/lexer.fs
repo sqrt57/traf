@@ -93,7 +93,7 @@ module Lexer =
         'f', 15L; 'F', 15L
     ]
 
-    let lex (fileName : string) (source : string) : Lexeme array =
+    let lex (source : string) : Lexeme array =
         let result = ResizeArray<Lexeme>()
 
         let rec processChar i =
@@ -126,7 +126,7 @@ module Lexer =
                 else if operatorChars.Contains c then
                     processOperator i
                 else
-                    raise <| LexerError {| fileName = fileName; message = sprintf "invalid char: %c" c |}
+                    raise <| LexerError {| message = sprintf "invalid char: %c" c |}
             else
                 ()
 
