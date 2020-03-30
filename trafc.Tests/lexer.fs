@@ -67,6 +67,42 @@ let ``Lex identifier with left and right curly brackets`` () =
     test <@ [| Lexeme.Identifier "abc"; Lexeme.LeftCurly; Lexeme.RightCurly |] = Lexer.lex "" "abc{}" @>
 
 [<Fact>]
+let ``Lex operator`` () =
+    test <@ [| Lexeme.Operator "+"; |] = Lexer.lex "" "+" @>
+    test <@ [| Lexeme.Operator "+"; |] = Lexer.lex "" " + " @>
+    test <@ [| Lexeme.Operator "==>"|] = Lexer.lex "" "==>" @>
+    test <@ [| Lexeme.Operator "==>"|] = Lexer.lex "" " ==> " @>
+
+[<Fact>]
+let ``Lex operator starting with minus`` () =
+    test <@ [| Lexeme.Operator "-" |] = Lexer.lex "" "-" @>
+    test <@ [| Lexeme.Operator "-" |] = Lexer.lex "" " - " @>
+    test <@ [| Lexeme.Operator "--" |] = Lexer.lex "" "--" @>
+    test <@ [| Lexeme.Operator "--" |] = Lexer.lex "" " -- " @>
+
+[<Fact>]
+let ``Lex operator starting with slash`` () =
+    test <@ [| Lexeme.Operator "/" |] = Lexer.lex "" "/" @>
+    test <@ [| Lexeme.Operator "/" |] = Lexer.lex "" " / " @>
+    test <@ [| Lexeme.Operator "/%" |] = Lexer.lex "" "/%" @>
+    test <@ [| Lexeme.Operator "/%" |] = Lexer.lex "" " /% " @>
+
+[<Fact>]
+let ``Lex identifier and operator`` () =
+    test <@ [| Lexeme.Identifier "a3"; Lexeme.Operator "++"; Lexeme.Identifier "_b4" |] = Lexer.lex "" "a3++_b4" @>
+
+[<Fact>]
+let ``Lex number and operator`` () =
+    test <@ [| Lexeme.Int 2L; Lexeme.Operator "+"; Lexeme.Int 3L |] = Lexer.lex "" "2+3" @>
+    test <@ [| Lexeme.Int 2L; Lexeme.Operator "-"; Lexeme.Int 3L |] = Lexer.lex "" "2-3" @>
+    test <@ [| Lexeme.Int 2L; Lexeme.Operator "-"; Lexeme.Int 3L |] = Lexer.lex "" "2 - 3" @>
+    test <@ [| Lexeme.Int 2L; Lexeme.Operator "-"; Lexeme.Int 3L |] = Lexer.lex "" "2 -3" @>
+
+[<Fact>]
+let ``Lex delimiters and operator`` () =
+    test <@ [| Lexeme.LeftBracket; Lexeme.Operator "++"; Lexeme.Dot; Lexeme.Operator "**"; Lexeme.RightBracket |] = Lexer.lex "" "(++.**)" @>
+
+[<Fact>]
 let ``Lex single chars`` () =
     test <@ [| Lexeme.LeftCurly; Lexeme.RightCurly; Lexeme.LeftBracket; Lexeme.RightBracket
                Lexeme.LeftSquare; Lexeme.RightSquare; Lexeme.Dot; Lexeme.Comma
@@ -142,19 +178,33 @@ let ``When lexing char literal with bad escape sequence then get error`` () =
 [<Fact>]
 let ``Lex zero number literal`` () =
     test <@ [| Lexeme.Int 0L |] = Lexer.lex "" "0" @>
+    test <@ [| Lexeme.Int 0L |] = Lexer.lex "" " 0 " @>
 
 [<Fact>]
 let ``Lex positive number literal`` () =
-    test <@ [| Lexeme.Int 1L; Lexeme.Int 23L |] = Lexer.lex "" "1 23" @>
+    test <@ [| Lexeme.Int 1L |] = Lexer.lex "" "1" @>
+    test <@ [| Lexeme.Int 1L |] = Lexer.lex "" " 1 " @>
+    test <@ [| Lexeme.Int 23L |] = Lexer.lex "" "23" @>
+    test <@ [| Lexeme.Int 23L |] = Lexer.lex "" " 23 " @>
 
 [<Fact>]
 let ``Lex negative number literal`` () =
-    test <@ [| Lexeme.Int 0L; Lexeme.Int -1L; Lexeme.Int -23L |] = Lexer.lex "" "-0 -1 -23" @>
+    test <@ [| Lexeme.Operator "-"; Lexeme.Int 0L |] = Lexer.lex "" "-0" @>
+    test <@ [| Lexeme.Operator "-"; Lexeme.Int 1L |] = Lexer.lex "" "-1" @>
+    test <@ [| Lexeme.Operator "-"; Lexeme.Int 23L |] = Lexer.lex "" "-23" @>
 
 [<Fact>]
 let ``Lex number literal with underscore`` () =
-    test <@ [| Lexeme.Int 11L; Lexeme.Int 12L |] = Lexer.lex "" "1__1 0_1_2" @>
+    test <@ [| Lexeme.Int 11L |] = Lexer.lex "" "1__1" @>
+    test <@ [| Lexeme.Int 11L |] = Lexer.lex "" " 1__1 " @>
+    test <@ [| Lexeme.Int 12L |] = Lexer.lex "" "0_1_2" @>
+    test <@ [| Lexeme.Int 12L |] = Lexer.lex "" " 0_1_2 " @>
 
 [<Fact>]
 let ``Lex hexadecimal number literal`` () =
-    test <@ [| Lexeme.Int 0L; Lexeme.Int 0x2bfL; Lexeme.Int -0xabcL |] = Lexer.lex "" "0x0 0x2bf -0Xa_b_C" @>
+    test <@ [| Lexeme.Int 0L |] = Lexer.lex "" "0x0" @>
+    test <@ [| Lexeme.Int 0L |] = Lexer.lex "" " 0x0 " @>
+    test <@ [| Lexeme.Int 0x2bfL |] = Lexer.lex "" "0x2bf" @>
+    test <@ [| Lexeme.Int 0x2bfL |] = Lexer.lex "" " 0x2bf " @>
+    test <@ [| Lexeme.Operator "-"; Lexeme.Int 0xabcL |] = Lexer.lex "" "-0Xa_b_C" @>
+    test <@ [| Lexeme.Operator "-"; Lexeme.Int 0xabcL |] = Lexer.lex "" " -0Xa_b_C " @>

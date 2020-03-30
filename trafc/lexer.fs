@@ -10,6 +10,7 @@ module LexemeModule =
     [<RequireQualifiedAccess>]
     type Lexeme =
         | Identifier of string
+        | Operator of string
         | StringLiteral of string
         | CharLiteral of char
         | Int of int64
@@ -48,6 +49,8 @@ module Lexer =
         '^', Lexeme.Caret
         '@', Lexeme.AtSign
     ]
+
+    let operatorChars = set [ '+'; '-'; '*'; '/'; '%'; '<'; '>'; '='; '!'; ':'; '|' ]
 
     let literalSpecialChars = readOnlyDict [
         '\\', '\\'
@@ -105,8 +108,6 @@ module Lexer =
                     processChar (i + 1)
                 else if decimalDigits.ContainsKey c then
                     processNumericalLiteral i
-                else if c = '-' then
-                    processNumericalLiteral i
                 else if c = '"' then
                     processStringLiteral i
                 else if c = '\'' then
@@ -119,9 +120,11 @@ module Lexer =
                         else if c1 = '*' then
                             processComment (i + 2)
                         else
-                            raise <| LexerError {| fileName = fileName; message = sprintf "invalid character sequence: '%s'" (source.Substring(i, 2)) |}
+                            processOperator i
                     else
-                        raise <| LexerError {| fileName = fileName; message = sprintf "invalid character sequence: '%s'" (source.Substring(i, 2)) |}
+                        processOperator i
+                else if operatorChars.Contains c then
+                    processOperator i
                 else
                     raise <| LexerError {| fileName = fileName; message = sprintf "invalid char: %c" c |}
             else
@@ -168,6 +171,20 @@ module Lexer =
                     source.Substring(start) |> Lexeme.Identifier |> result.Add
                     ()
             processIdentifierInner (start + 1)
+
+        and processOperator start =
+            let rec processOperatorInner i =
+                if i < source.Length then
+                    let c = source.[i]
+                    if operatorChars.Contains c then
+                        processOperatorInner (i + 1)
+                    else
+                        source.Substring(start, i - start) |> Lexeme.Operator |> result.Add
+                        processChar i
+                else
+                    source.Substring(start) |> Lexeme.Operator |> result.Add
+                    ()
+            processOperatorInner (start + 1)
 
         and processStringLiteral start =
             let literal = StringBuilder()
