@@ -56,37 +56,71 @@ module CstParser =
 
     exception CstParserError of {| message: string |}
 
+    type private ParserBuilder() =
+
+        member this.Bind(x, f) =
+            match x with
+            | Ok value -> f value
+            | Error e -> Error e
+
+        member this.Return(x) = Ok x
+
+    let private parser = ParserBuilder()
+
     let parse (lexemes: Lexeme list) : Cst.TopLevel =
 
-        let expectedButGot expected lexemes =
+        let errorExpectedButGot expected lexemes =
             match lexemes with 
             | lexeme :: _ -> raise <| CstParserError {| message = sprintf "expected %s but got %A" expected lexeme |}
             | [] -> raise <| CstParserError {| message = sprintf "expected %s but got EOF" expected |}
 
+        let expectedButGot expected lexemes =
+            match lexemes with 
+            | lexeme :: _ -> Error <| sprintf "expected %s but got %A" expected lexeme
+            | [] -> Error <| sprintf "expected %s but got EOF" expected
+
         let constDefinition lexemes =
-            match lexemes with
-            | Lexeme.Identifier name :: rest ->
-                match rest with
-                | Lexeme.Operator ":" :: rest ->
-                    match rest with
-                    | Lexeme.Identifier typeName :: rest ->
-                        match rest with
-                        | Lexeme.Operator ":=" :: rest ->
-                            match rest with
-                            | Lexeme.Int intValue :: rest ->
-                                match rest with
-                                | Lexeme.Semicolon :: rest ->
-                                    let constantDefinition =
-                                        { Cst.ConstantDefinition.name = name
-                                          Cst.ConstantDefinition.type_ = Cst.Builtin typeName
-                                          Cst.ConstantDefinition.value = Cst.IntVal intValue }
-                                    constantDefinition, rest
-                                | other -> expectedButGot "semicolon after constant definition" other
-                            | other -> expectedButGot "constant value after assignment operator in constant definition" other
-                        | other -> expectedButGot "assignment operator after constant type in constant definition" other
+            let parseResult = parser {
+                let! lexemes, name =
+                    match lexemes with
+                    | Lexeme.Identifier name :: rest -> Ok (rest, name)
+                    | other -> expectedButGot "constant name after const keyword" other
+
+                let! lexemes =
+                    match lexemes with
+                    | Lexeme.Operator ":" :: rest -> Ok rest
+                    | other -> expectedButGot "colon after constant name in constant definition" other
+
+                let! lexemes, typeName =
+                    match lexemes with
+                    | Lexeme.Identifier typeName :: rest -> Ok (rest, typeName)
                     | other -> expectedButGot "constant type after colon in constant definition" other
-                | other -> expectedButGot "colon after constant name in constant definition" other
-            | other -> expectedButGot "constant name after const keyword" other
+
+                let! lexemes =
+                    match lexemes with
+                    | Lexeme.Operator ":=" :: rest -> Ok rest
+                    | other -> expectedButGot "assignment operator after constant type in constant definition" other
+
+                let! lexemes, intValue =
+                    match lexemes with
+                    | Lexeme.Int intValue :: rest -> Ok (rest, intValue)
+                    | other -> expectedButGot "constant value after assignment operator in constant definition" other
+
+                let! lexemes =
+                    match lexemes with
+                    | Lexeme.Semicolon :: rest -> Ok rest
+                    | other -> expectedButGot "semicolon after constant definition" other
+
+                let constantDefinition =
+                    { Cst.ConstantDefinition.name = name
+                      Cst.ConstantDefinition.type_ = Cst.Builtin typeName
+                      Cst.ConstantDefinition.value = Cst.IntVal intValue }
+                return constantDefinition, lexemes
+            }
+
+            match parseResult with
+            | Ok result -> result
+            | Error message -> raise <| CstParserError {| message = message |}
 
         let moduleBody lexemes =
 
@@ -99,7 +133,7 @@ module CstParser =
                     moduleBodyItems.Add <| Cst.ConstDefinition definition
                     moduleBodyItem rest
                 | Lexeme.RightCurly :: _ -> lexemes
-                | other -> expectedButGot "closing curly bracket after module body" other
+                | other -> errorExpectedButGot "closing curly bracket after module body" other
 
             let rest = moduleBodyItem lexemes
             List.ofSeq moduleBodyItems, rest
@@ -112,9 +146,9 @@ module CstParser =
                     let definitions, rest = moduleBody rest
                     match rest with
                     | Lexeme.RightCurly :: rest -> { Cst.Module.name = name; Cst.definitions = definitions }, rest
-                    | other -> expectedButGot "closing curly bracket after module body" other
-                | other -> expectedButGot "opening curly bracket after module name" other
-            | other -> expectedButGot "module name after module keyword" other
+                    | other -> errorExpectedButGot "closing curly bracket after module body" other
+                | other -> errorExpectedButGot "opening curly bracket after module name" other
+            | other -> errorExpectedButGot "module name after module keyword" other
 
         let topLevel lexemes =
 
