@@ -67,49 +67,46 @@ module CstParser =
 
     let private parser = ParserBuilder()
 
+    let errorExpectedButGot expected lexemes =
+        match lexemes with 
+        | lexeme :: _ -> raise <| CstParserError {| message = sprintf "expected %s but got %A" expected lexeme |}
+        | [] -> raise <| CstParserError {| message = sprintf "expected %s but got EOF" expected |}
+
+    let expectedButGot expected lexemes =
+        match lexemes with 
+        | lexeme :: _ -> Error <| sprintf "expected %s but got %A" expected lexeme
+        | [] -> Error <| sprintf "expected %s but got EOF" expected
+
+    let matchEq lexemes value errorMessage =
+        match lexemes with
+        | x :: rest when x = value -> Ok rest
+        | other -> expectedButGot errorMessage other
+
     let parse (lexemes: Lexeme list) : Cst.TopLevel =
 
-        let errorExpectedButGot expected lexemes =
-            match lexemes with 
-            | lexeme :: _ -> raise <| CstParserError {| message = sprintf "expected %s but got %A" expected lexeme |}
-            | [] -> raise <| CstParserError {| message = sprintf "expected %s but got EOF" expected |}
-
-        let expectedButGot expected lexemes =
-            match lexemes with 
-            | lexeme :: _ -> Error <| sprintf "expected %s but got %A" expected lexeme
-            | [] -> Error <| sprintf "expected %s but got EOF" expected
-
         let constDefinition lexemes =
+
             let parseResult = parser {
                 let! lexemes, name =
                     match lexemes with
                     | Lexeme.Identifier name :: rest -> Ok (rest, name)
                     | other -> expectedButGot "constant name after const keyword" other
 
-                let! lexemes =
-                    match lexemes with
-                    | Lexeme.Operator ":" :: rest -> Ok rest
-                    | other -> expectedButGot "colon after constant name in constant definition" other
+                let! lexemes = matchEq lexemes (Lexeme.Operator ":") "colon after constant name in constant definition"
 
                 let! lexemes, typeName =
                     match lexemes with
                     | Lexeme.Identifier typeName :: rest -> Ok (rest, typeName)
                     | other -> expectedButGot "constant type after colon in constant definition" other
 
-                let! lexemes =
-                    match lexemes with
-                    | Lexeme.Operator ":=" :: rest -> Ok rest
-                    | other -> expectedButGot "assignment operator after constant type in constant definition" other
+                let! lexemes = matchEq lexemes (Lexeme.Operator ":=") "assignment operator after constant type in constant definition"
 
                 let! lexemes, intValue =
                     match lexemes with
                     | Lexeme.Int intValue :: rest -> Ok (rest, intValue)
                     | other -> expectedButGot "constant value after assignment operator in constant definition" other
 
-                let! lexemes =
-                    match lexemes with
-                    | Lexeme.Semicolon :: rest -> Ok rest
-                    | other -> expectedButGot "semicolon after constant definition" other
+                let! lexemes = matchEq lexemes Lexeme.Semicolon "semicolon after constant definition"
 
                 let constantDefinition =
                     { Cst.ConstantDefinition.name = name
