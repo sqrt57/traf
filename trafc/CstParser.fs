@@ -71,59 +71,56 @@ module ParserHelper =
 
     let parseSeq = ParseSeqBuilder()
 
+    let failWith error lexemes = Error error
+
     let expectedButGot expected lexemes =
         match lexemes with 
-        | lexeme :: _ -> Error <| sprintf "expected %s but got %A" expected lexeme
-        | [] -> Error <| sprintf "expected %s but got EOF" expected
+        | lexeme :: _ -> expected, Some lexeme
+        | [] -> expected, None
 
-    let matchEq value errorMessage lexemes =
+    let matchEq value expected lexemes =
         match lexemes with
         | x :: rest when x = value -> Ok (rest, ())
-        | other -> expectedButGot errorMessage other
+        | other -> failWith (expectedButGot expected other) other
 
-    let matchFilter filter errorMessage lexemes =
+    let matchIdentifier expected lexemes =
         match lexemes with
-        | x :: rest ->
+        | (Lexeme.Identifier identifier) :: rest -> Ok (rest, identifier)
+        | other -> failWith (expectedButGot expected other) other
+
+    let matchInt expected lexemes =
+        match lexemes with
+        | (Lexeme.Int intValue) :: rest -> Ok (rest, intValue)
+        | other -> failWith (expectedButGot expected other) other
+
+    let matchFilter filter expected lexemes =
+        match lexemes with
+        | (x :: rest) as lexemes ->
             match filter x with
             | Some x -> Ok (rest, x)
-            | None -> expectedButGot errorMessage (x :: rest)
-        | other -> expectedButGot errorMessage other
+            | None -> failWith (expectedButGot expected lexemes) lexemes
+        | other -> failWith (expectedButGot expected other) other
 
 module CstParser =
 
     open ParserHelper
 
-    exception CstParserError of {| message: string |}
+    exception CstParserError of {| expected: string; got: Lexeme option; |}
 
     let errorExpectedButGot expected lexemes =
-        match lexemes with 
-        | lexeme :: _ -> raise <| CstParserError {| message = sprintf "expected %s but got %A" expected lexeme |}
-        | [] -> raise <| CstParserError {| message = sprintf "expected %s but got EOF" expected |}
+        let (expected, got) = expectedButGot expected lexemes
+        raise <| CstParserError {| expected = expected; got = got; |}
 
     let parse (lexemes: Lexeme list) : Cst.TopLevel =
 
         let constDefinition lexemes =
 
             let parser = parseSeq {
-                let! name = matchFilter (function
-                                         | Lexeme.Identifier name -> Some name
-                                         | _ -> None)
-                                        "constant name after const keyword"
-
+                let! name = matchIdentifier "constant name after const keyword"
                 do! matchEq (Lexeme.Operator ":") "colon after constant name in constant definition"
-
-                let! typeName = matchFilter (function
-                                            | Lexeme.Identifier typeName -> Some typeName
-                                            | _ -> None)
-                                            "constant type after colon in constant definition"
-
+                let! typeName = matchIdentifier "constant type after colon in constant definition"
                 do! matchEq (Lexeme.Operator ":=") "assignment operator after constant type in constant definition"
-
-                let! intValue = matchFilter (function
-                                            | Lexeme.Int intValue -> Some intValue
-                                            | _ -> None)
-                                            "constant value after assignment operator in constant definition"
-
+                let! intValue = matchInt "constant value after assignment operator in constant definition"
                 do! matchEq Lexeme.Semicolon "semicolon after constant definition"
 
                 let constantDefinition =
@@ -137,7 +134,7 @@ module CstParser =
 
             match parseResult with
             | Ok result -> result
-            | Error message -> raise <| CstParserError {| message = message |}
+            | Error (expected, got) -> raise <| CstParserError {| expected = expected; got = got; |}
 
         let moduleBody lexemes =
 
@@ -178,7 +175,7 @@ module CstParser =
                     let module_, rest = moduleDefinition rest
                     modules.Add module_
                     topLevelItem rest
-                | l :: _ -> raise <| CstParserError {| message = sprintf "unexpected lexeme at top level: %A" l |}
+                | other -> errorExpectedButGot "module definition at top level" other
 
             topLevelItem lexemes
             Cst.TopLevel <| List.ofSeq modules
