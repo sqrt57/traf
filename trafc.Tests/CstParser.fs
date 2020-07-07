@@ -34,8 +34,8 @@ let ``Parse two empty modules`` () =
 
 
 [<Fact>]
-let ``Parse const definition stub`` () =
-    let definitions = [ Cst.ConstDefinition { name = "C"; type_ = Cst.Builtin "int32"; value = Cst.IntVal 15L } ]
+let ``Parse const definition with simple type`` () =
+    let definitions = [ Cst.ConstDefinition { name = "C"; type_ = Cst.TypeName "int32"; value = Cst.IntVal 15L } ]
     let expected = Cst.TopLevel [ { name = "Mod"; definitions = definitions } ]
     let actual = CstParser.parse [ Lexeme.Identifier "module"
                                    Lexeme.Identifier "Mod"
@@ -43,6 +43,75 @@ let ``Parse const definition stub`` () =
                                    Lexeme.Identifier "const"
                                    Lexeme.Identifier "C"
                                    Lexeme.Operator ":"
+                                   Lexeme.Identifier "int32"
+                                   Lexeme.Operator ":="
+                                   Lexeme.Int 15L
+                                   Lexeme.Semicolon
+                                   Lexeme.RightCurly ]
+    test <@ expected = actual @>
+
+[<Fact>]
+let ``Parse const definition with pointer type`` () =
+    let definitions = [
+        Cst.ConstDefinition {
+            name = "C"
+            type_ = Cst.Pointer <| Cst.TypeName "int32"
+            value = Cst.IntVal 15L } ]
+    let expected = Cst.TopLevel [ { name = "Mod"; definitions = definitions } ]
+    let actual = CstParser.parse [ Lexeme.Identifier "module"
+                                   Lexeme.Identifier "Mod"
+                                   Lexeme.LeftCurly
+                                   Lexeme.Identifier "const"
+                                   Lexeme.Identifier "C"
+                                   Lexeme.Operator ":"
+                                   Lexeme.Caret
+                                   Lexeme.Identifier "int32"
+                                   Lexeme.Operator ":="
+                                   Lexeme.Int 15L
+                                   Lexeme.Semicolon
+                                   Lexeme.RightCurly ]
+    test <@ expected = actual @>
+
+[<Fact>]
+let ``Parse const definition with sized array type`` () =
+    let definitions = [
+        Cst.ConstDefinition {
+            name = "C"
+            type_ = Cst.Array {| type_ = Cst.TypeName "int32"; size = Some <| Cst.IntVal 20L; |}
+            value = Cst.IntVal 15L } ]
+    let expected = Cst.TopLevel [ { name = "Mod"; definitions = definitions } ]
+    let actual = CstParser.parse [ Lexeme.Identifier "module"
+                                   Lexeme.Identifier "Mod"
+                                   Lexeme.LeftCurly
+                                   Lexeme.Identifier "const"
+                                   Lexeme.Identifier "C"
+                                   Lexeme.Operator ":"
+                                   Lexeme.LeftSquare
+                                   Lexeme.Int 20L
+                                   Lexeme.RightSquare
+                                   Lexeme.Identifier "int32"
+                                   Lexeme.Operator ":="
+                                   Lexeme.Int 15L
+                                   Lexeme.Semicolon
+                                   Lexeme.RightCurly ]
+    test <@ expected = actual @>
+
+[<Fact>]
+let ``Parse const definition with unsized array type`` () =
+    let definitions = [
+        Cst.ConstDefinition {
+            name = "C"
+            type_ = Cst.Array {| type_ = Cst.TypeName "int32"; size = None; |}
+            value = Cst.IntVal 15L } ]
+    let expected = Cst.TopLevel [ { name = "Mod"; definitions = definitions } ]
+    let actual = CstParser.parse [ Lexeme.Identifier "module"
+                                   Lexeme.Identifier "Mod"
+                                   Lexeme.LeftCurly
+                                   Lexeme.Identifier "const"
+                                   Lexeme.Identifier "C"
+                                   Lexeme.Operator ":"
+                                   Lexeme.LeftSquare
+                                   Lexeme.RightSquare
                                    Lexeme.Identifier "int32"
                                    Lexeme.Operator ":="
                                    Lexeme.Int 15L

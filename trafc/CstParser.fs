@@ -20,7 +20,7 @@ module Cst =
     type TupleType = Tuple of {| name: string option; type_: Type |} list
     and FunType = { arguments: TupleType; result: TupleType }
     and Type =
-        | Builtin of string
+        | TypeName of string
         | Array of {| type_: Type; size: Expr option |}
         | Pointer of Type
         | Fun of FunType
@@ -101,6 +101,19 @@ module ParserHelper =
             | None -> failWith (expectedButGot expected lexemes) lexemes
         | other -> failWith (expectedButGot expected other) other
 
+    let tryParser err parser defaultValue lexemes =
+        match parser lexemes with
+        | Ok (rest, value) -> Ok (rest, value)
+        | Error _ -> Ok (lexemes, defaultValue)
+
+    let rec tryParsers err parsers lexemes =
+        match parsers with
+        | parser :: rest ->
+            match parser lexemes with
+            | Ok (rest, value) -> Ok (rest, value)
+            | Error _ -> tryParsers err rest lexemes
+        | [] -> Error <| expectedButGot err lexemes
+
 module CstParser =
 
     open ParserHelper
@@ -113,19 +126,40 @@ module CstParser =
 
     let parse (lexemes: Lexeme list) : Cst.TopLevel =
 
+
+        let rec type_ err =
+
+            let typeName = parseSeq { let! typeName = matchIdentifier err in return Cst.TypeName typeName }
+
+            let pointerType = parseSeq {
+                do! matchEq Lexeme.Caret err
+                let! pointerType = type_ err
+                return Cst.Pointer pointerType }
+
+            let arrayType = parseSeq {
+                do! matchEq Lexeme.LeftSquare err
+                let! size = tryParser err (parseSeq { let! intValue = matchInt err in return Some <| Cst.IntVal intValue} ) None 
+                do! matchEq Lexeme.RightSquare err
+                let! pointerType = type_ err
+                return Cst.Array {| type_ = pointerType; size = size; |} }
+
+            tryParsers err [ typeName
+                             pointerType
+                             arrayType ]
+
         let constDefinition lexemes =
 
             let parser = parseSeq {
                 let! name = matchIdentifier "constant name after const keyword"
                 do! matchEq (Lexeme.Operator ":") "colon after constant name in constant definition"
-                let! typeName = matchIdentifier "constant type after colon in constant definition"
+                let! constType = type_ "constant type after colon in constant definition"
                 do! matchEq (Lexeme.Operator ":=") "assignment operator after constant type in constant definition"
                 let! intValue = matchInt "constant value after assignment operator in constant definition"
                 do! matchEq Lexeme.Semicolon "semicolon after constant definition"
 
                 let constantDefinition =
                     { Cst.ConstantDefinition.name = name
-                      Cst.ConstantDefinition.type_ = Cst.Builtin typeName
+                      Cst.ConstantDefinition.type_ = constType
                       Cst.ConstantDefinition.value = Cst.IntVal intValue }
                 return constantDefinition
             }
