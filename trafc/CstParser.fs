@@ -17,13 +17,14 @@ module Cst =
         | SizeOf of Expr
         | AddressOf of Expr
 
-    type TupleType = Tuple of {| name: string option; type_: Type |} list
+    type TupleType = TupleType of {| name: string option; type_: Type |} list
     and FunType = { arguments: TupleType; result: TupleType }
     and Type =
         | TypeName of string
         | Array of {| type_: Type; size: Expr option |}
         | Pointer of Type
         | Fun of FunType
+        | Tuple of TupleType
 
     type AttrValue =
         | None
@@ -69,6 +70,8 @@ module ParserHelper =
         member this.Return(x: 'x) : Parser<'lex, 'x, 'err> =
             fun lexemes -> Ok (lexemes, x)
 
+        member this.ReturnFrom(x: Parser<'lex, 'x, 'err>) : Parser<'lex, 'x, 'err> = x
+
     let parseSeq = ParseSeqBuilder()
 
     let failWith error lexemes = Error error
@@ -101,7 +104,7 @@ module ParserHelper =
             | None -> failWith (expectedButGot expected lexemes) lexemes
         | other -> failWith (expectedButGot expected other) other
 
-    let tryParser err parser defaultValue lexemes =
+    let maybeParse parser defaultValue lexemes =
         match parser lexemes with
         | Ok (rest, value) -> Ok (rest, value)
         | Error _ -> Ok (lexemes, defaultValue)
@@ -119,6 +122,10 @@ module CstParser =
     open ParserHelper
 
     exception CstParserError of {| expected: string; got: Lexeme option; |}
+        with
+            override this.Message =
+                sprintf "Error while parsing to CST: Expected %s but got %O"
+                    this.Data0.expected this.Data0.got
 
     let errorExpectedButGot expected lexemes =
         let (expected, got) = expectedButGot expected lexemes
@@ -126,10 +133,11 @@ module CstParser =
 
     let parse (lexemes: Lexeme list) : Cst.TopLevel =
 
-
         let rec type_ err =
 
-            let typeName = parseSeq { let! typeName = matchIdentifier err in return Cst.TypeName typeName }
+            let typeName = parseSeq {
+                let! typeName = matchIdentifier err
+                return Cst.TypeName typeName }
 
             let pointerType = parseSeq {
                 do! matchEq Lexeme.Caret err
@@ -138,14 +146,62 @@ module CstParser =
 
             let arrayType = parseSeq {
                 do! matchEq Lexeme.LeftSquare err
-                let! size = tryParser err (parseSeq { let! intValue = matchInt err in return Some <| Cst.IntVal intValue} ) None 
+                let! size = maybeParse
+                                ( parseSeq {
+                                    let! intValue = matchInt err
+                                    return Some <| Cst.IntVal intValue} )
+                                None 
                 do! matchEq Lexeme.RightSquare err
                 let! pointerType = type_ err
                 return Cst.Array {| type_ = pointerType; size = size; |} }
 
-            tryParsers err [ typeName
-                             pointerType
-                             arrayType ]
+            let rec typeCloseBrackets elements =
+                tryParsers err [
+                    parseSeq {
+                        do! matchEq Lexeme.Comma err
+                        let! nextType = type_ err
+                        let newElements = {| name = None; type_ = nextType; |} :: elements
+                        return! typeCloseBrackets newElements }
+                    parseSeq {
+                        do! matchEq Lexeme.RightBracket err
+                        return elements |> List.rev |> Cst.TupleType |> Cst.Type.Tuple }
+                ]
+
+            let typeBrackets = parseSeq {
+                do! matchEq Lexeme.LeftBracket err
+                return! tryParsers err [
+                    parseSeq {
+                        do! matchEq Lexeme.RightBracket err
+                        return [] |> Cst.TupleType |> Cst.Type.Tuple }
+                    parseSeq {
+                        let! firstType = type_ err
+                        let! tupleType = typeCloseBrackets [ {| name= None; type_ = firstType |} ]
+                        return tupleType }
+                ] }
+
+            let nonFunType =
+                tryParsers err
+                  [ typeName
+                    pointerType
+                    arrayType
+                    typeBrackets ]
+
+            let toTupleType = function
+                | Cst.Type.Tuple tt -> tt
+                | t -> Cst.TupleType [ {| name = None; type_ = t|} ]
+
+            let funType =
+                parseSeq {
+                    let! arguments = nonFunType
+                    do! matchEq (Lexeme.Operator "->") ""
+                    let! result = type_ err
+                    return Cst.Fun { arguments = toTupleType arguments
+                                     result = toTupleType result }
+                }
+
+            tryParsers err
+              [ funType
+                nonFunType ]
 
         let constDefinition lexemes =
 

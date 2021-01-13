@@ -119,3 +119,26 @@ let ``Parse const definition with unsized array type`` () =
                                    Lexeme.RightCurly ]
     test <@ expected = actual @>
 
+[<Fact>]
+let ``Parse const definition simple type with brackets`` () =
+    let definitions =
+      [ Cst.ConstDefinition
+          { name = "C"
+            type_ = Cst.Type.Tuple <| Cst.TupleType [ {| name = None; type_ = Cst.TypeName "int32" |} ]
+            value = Cst.IntVal 15L } ]
+    let expected = Cst.TopLevel [ { name = "Mod"; definitions = definitions } ]
+    let actual = CstParser.parse [ Lexeme.Identifier "module"
+                                   Lexeme.Identifier "Mod"
+                                   Lexeme.LeftCurly
+                                   Lexeme.Identifier "const"
+                                   Lexeme.Identifier "C"
+                                   Lexeme.Operator ":"
+                                   Lexeme.LeftBracket
+                                   Lexeme.Identifier "int32"
+                                   Lexeme.RightBracket
+                                   Lexeme.Operator ":="
+                                   Lexeme.Int 15L
+                                   Lexeme.Semicolon
+                                   Lexeme.RightCurly ]
+    test <@ expected = actual @>
+
