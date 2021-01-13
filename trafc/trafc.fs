@@ -59,3 +59,6 @@ let main argv =
         | Lexer.LexerError err ->
             eprintfn "Error while lexing: %s" err.message
             1
+        | CstParser.CstParserError err ->
+            eprintfn "Error while parsing to CST: Expected %s but got %O" err.expected err.got
+            1
