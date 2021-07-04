@@ -34,18 +34,18 @@ module Cst =
     type AttrList = AttrList of AttrDefinition list
     type AttrLists = AttrLists of AttrList list
 
-    type ConstantDefinition = { name: string; type_: Type; value: Expr; }
+    type ConstDefinition = { name: string; type_: Type; value: Expr; }
     type VariableDefinition = { name: string; type_: Type; value: Expr option; }
 
     type Statement =
-        | ConstStatement of ConstantDefinition
+        | ConstStatement of ConstDefinition
         | VarStatement of VariableDefinition
         | Assignment of {| name: string; value: Expr; |}
         | Expression of Expr
     type FunBody = FunBody of Statement list
 
     type ModuleTopLevel =
-        | ConstDefinition of ConstantDefinition
+        | ConstDefinition of ConstDefinition
         | FunDefinition of {| name: string; type_: FunType; body: FunBody; attributes: AttrLists |}
         | ExternFunDefinition of {| name: string; type_: FunType; attributes: AttrLists |}
 
@@ -214,10 +214,33 @@ module CstParser =
                 do! matchEq Lexeme.Semicolon "semicolon after constant definition"
 
                 let constantDefinition =
-                    { Cst.ConstantDefinition.name = name
-                      Cst.ConstantDefinition.type_ = constType
-                      Cst.ConstantDefinition.value = Cst.IntVal intValue }
+                    { Cst.ConstDefinition.name = name
+                      Cst.ConstDefinition.type_ = constType
+                      Cst.ConstDefinition.value = Cst.IntVal intValue }
                 return constantDefinition
+            }
+
+            let parseResult = parser lexemes
+
+            match parseResult with
+            | Ok result -> result
+            | Error (expected, got) -> raise <| CstParserError {| expected = expected; got = got; |}
+
+        let funDefinition lexemes =
+
+            let parser = parseSeq {
+                let! name = matchIdentifier "function name after fun keyword"
+                do! matchEq (Lexeme.Operator ":") "colon after function name in function definition"
+                let! funType = type_ "function type after colon in constant definition"
+                do! matchEq Lexeme.LeftCurly "function body after function type in function definition"
+                do! matchEq Lexeme.RightCurly "closing curly bracket after function body in function definition"
+
+                let functionDefinition =
+                    {| name = name
+                       type_ = { Cst.arguments = Cst.TupleType []; Cst.result = Cst.TupleType [] }
+                       body = Cst.FunBody []
+                       attributes = Cst.AttrLists [] |}
+                return functionDefinition
             }
 
             let parseResult = parser lexemes
@@ -235,6 +258,10 @@ module CstParser =
                 | Lexeme.Identifier "const" :: rest ->
                     let rest, definition = constDefinition rest
                     moduleBodyItems.Add <| Cst.ConstDefinition definition
+                    moduleBodyItem rest
+                | Lexeme.Identifier "fun" :: rest ->
+                    let rest, definition = funDefinition rest
+                    moduleBodyItems.Add <| Cst.FunDefinition definition
                     moduleBodyItem rest
                 | Lexeme.RightCurly :: _ -> lexemes
                 | other -> errorExpectedButGot "closing curly bracket after module body" other

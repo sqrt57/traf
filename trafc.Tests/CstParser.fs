@@ -142,3 +142,29 @@ let ``Parse const definition simple type with brackets`` () =
                                    Lexeme.RightCurly ]
     test <@ expected = actual @>
 
+[<Fact>]
+let ``Parse empty function definition`` () =
+    let definitions =
+      [ Cst.FunDefinition
+            {|
+                name = "F"
+                type_ = { arguments = Cst.TupleType []; result = Cst.TupleType [] }
+                body = Cst.FunBody []
+                attributes = Cst.AttrLists []
+            |} ]
+    let expected = Cst.TopLevel [ { name = "Mod"; definitions = definitions } ]
+    let actual = CstParser.parse [ Lexeme.Identifier "module"
+                                   Lexeme.Identifier "Mod"
+                                   Lexeme.LeftCurly
+                                   Lexeme.Identifier "fun"
+                                   Lexeme.Identifier "F"
+                                   Lexeme.Operator ":"
+                                   Lexeme.LeftBracket
+                                   Lexeme.RightBracket
+                                   Lexeme.Operator "->"
+                                   Lexeme.LeftBracket
+                                   Lexeme.RightBracket
+                                   Lexeme.LeftCurly
+                                   Lexeme.RightCurly
+                                   Lexeme.RightCurly ]
+    test <@ expected = actual @>
