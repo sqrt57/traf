@@ -143,7 +143,7 @@ let ``Parse const definition simple type with brackets`` () =
     test <@ expected = actual @>
 
 [<Fact>]
-let ``Parse empty function definition`` () =
+let ``Parse function definition`` () =
     let definitions =
       [ Cst.FunDefinition
             {|
@@ -260,3 +260,45 @@ let ``Parse function definition with complex types`` () =
                                    Lexeme.RightCurly
                                    Lexeme.RightCurly ]
     test <@ expected = actual @>
+
+[<Fact>]
+let ``Parse external function definition`` () =
+    let definitions =
+      [ Cst.ExternFunDefinition
+            {|
+                name = "exit_process"
+                type_ = { arguments = Cst.TupleType [ {| name = None; type_ = Cst.TypeName "uint32"; |} ]
+                          result = Cst.TupleType [] }
+                attributes = Cst.AttrLists [
+                    Cst.AttrList [ { name = "dll_import"; value = Cst.String "kernel32.dll" }
+                                   { name = "entry_point"; value = Cst.Int 5L } ]
+                    Cst.AttrList [ { name = "std_call"; value = Cst.None } ] ]
+            |} ]
+    let expected = Cst.TopLevel [ { name = "Mod"; definitions = definitions } ]
+    let actual = CstParser.parse [ Lexeme.Identifier "module"
+                                   Lexeme.Identifier "Mod"
+                                   Lexeme.LeftCurly
+                                   Lexeme.Identifier "extern"
+                                   Lexeme.LeftSquare
+                                   Lexeme.Identifier "dll_import"
+                                   Lexeme.Operator "="
+                                   Lexeme.StringLiteral "kernel32.dll"
+                                   Lexeme.Comma
+                                   Lexeme.Identifier "entry_point"
+                                   Lexeme.Operator "="
+                                   Lexeme.Int 5L
+                                   Lexeme.RightSquare
+                                   Lexeme.LeftSquare
+                                   Lexeme.Identifier "std_call"
+                                   Lexeme.RightSquare
+                                   Lexeme.Identifier "fun"
+                                   Lexeme.Identifier "exit_process"
+                                   Lexeme.Operator ":"
+                                   Lexeme.Identifier "uint32"
+                                   Lexeme.Operator "->"
+                                   Lexeme.LeftBracket
+                                   Lexeme.RightBracket
+                                   Lexeme.Semicolon
+                                   Lexeme.RightCurly ]
+    test <@ expected = actual @>
+

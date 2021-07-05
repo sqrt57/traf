@@ -121,6 +121,11 @@ module ParserHelper =
         | (Lexeme.Int intValue) :: rest -> Match (rest, intValue)
         | _ -> NoMatch
 
+    let tryMatchString lexemes =
+        match lexemes with
+        | (Lexeme.StringLiteral stringValue) :: rest -> Match (rest, stringValue)
+        | _ -> NoMatch
+
     let matchEof expected lexemes =
         match lexemes with
         | [] -> Match ([], ())
@@ -134,8 +139,8 @@ module ParserHelper =
             | None -> failWith (expectedButGot expected lexemes)
         | other -> failWith (expectedButGot expected other)
 
-    let maybeParse parser defaultValue lexemes =
-        match parser lexemes with
+    let maybeParse defaultValue p lexemes =
+        match p lexemes with
         | Match m -> Match m
         | NoMatch -> Match (lexemes, defaultValue)
         | Error err -> Error err
@@ -196,11 +201,9 @@ module CstParser =
 
         and private arrayType lexemes = (parseSeq {
             do! tryMatchEq Lexeme.LeftSquare
-            let! size = maybeParse
-                            ( parseSeq {
-                                let! intValue = tryMatchInt
-                                return Some <| Cst.IntVal intValue} )
-                            None 
+            let! size = maybeParse None (parseSeq {
+                let! intValue = tryMatchInt
+                return Some <| Cst.IntVal intValue } )
             do! matchEq Lexeme.RightSquare "closing square bracket in array type"
             let! arrayType = failIfNoMatch anyType "array element type"
             return Cst.Array {| type_ = arrayType; size = size; |} } ) lexemes
@@ -262,7 +265,7 @@ module CstParser =
 
         let funType = parseSeq {
             let! arguments = failIfNoMatch nonFunType "type in function arguments type"
-            do! matchEq (Lexeme.Operator "->") "->"
+            do! matchEq (Lexeme.Operator "->") "-> in function type"
             let! result = failIfNoMatch nonFunType "type in function result type"
             return { Cst.arguments = toTupleType arguments
                      Cst.result = toTupleType result } }
@@ -299,10 +302,45 @@ module CstParser =
                    attributes = Cst.AttrLists [] |}
             return functionDefinition }
 
+        let funAttr = parseSeq {
+            let! name = tryMatchIdentifier
+            let! value = maybeParse Cst.None (parseSeq {
+                do! tryMatchEq (Lexeme.Operator "=")
+                return! failIfNoMatch (tryParsers [
+                    parseSeq { let! value = tryMatchInt in return Cst.Int value }
+                    parseSeq { let! value = tryMatchString in return Cst.String value }
+                ] ) "attribute value"
+            } )
+            return { Cst.name = name; Cst.value = value; } }
+
+        let funAttrList = parseSeq {
+            do! tryMatchEq Lexeme.LeftSquare
+            let! first = funAttr
+            let! rest = many (parseSeq {
+                do! tryMatchEq Lexeme.Comma
+                return! funAttr } )
+            do! matchEq Lexeme.RightSquare "attribute or right square bracket"
+            return Cst.AttrList (first :: rest) }
+
+        let externFunDefinition = parseSeq {
+            do! tryMatchEq (Lexeme.Identifier "extern")
+            let! attrLists = many funAttrList
+            do! tryMatchEq (Lexeme.Identifier "fun")
+            let! name = matchIdentifier "function name after fun keyword"
+            do! matchEq (Lexeme.Operator ":") "colon after function name in external function definition"
+            let! funType = ParseType.funType
+            do! matchEq Lexeme.Semicolon "semicolon after external function definition"
+
+            let externDefinition =
+                {| name = name
+                   type_ = { Cst.arguments = funType.arguments; Cst.result = funType.result }
+                   attributes = Cst.AttrLists attrLists |}
+            return externDefinition }
 
         let moduleBodyItem = tryParsers [
             parseSeq { let! constDef = constDefinition in return Cst.ConstDefinition constDef }
             parseSeq { let! funDef = funDefinition in return Cst.FunDefinition funDef }
+            parseSeq { let! externDef = externFunDefinition in return Cst.ExternFunDefinition externDef }
         ]
 
         let moduleDefinition = parseSeq {
