@@ -121,6 +121,11 @@ module ParserHelper =
         | (Lexeme.Int intValue) :: rest -> Match (rest, intValue)
         | _ -> NoMatch
 
+    let matchEof expected lexemes =
+        match lexemes with
+        | [] -> Match ([], ())
+        | other -> failWith (expectedButGot expected other)
+
     let matchFilter filter expected lexemes =
         match lexemes with
         | (x :: rest) as lexemes ->
@@ -150,6 +155,16 @@ module ParserHelper =
         | NoMatch -> Error <| expectedButGot err lexemes
         | Error e -> Error e
 
+    let many parser =
+        let rec manyImpl acc = tryParsers [
+            parseSeq {
+                let! result = parser
+                return! manyImpl (result :: acc)
+            }
+            parseSeq { return List.rev acc }
+        ]
+        manyImpl []
+
 
 module CstParser =
 
@@ -165,9 +180,9 @@ module CstParser =
         with
             override this.Message = "Error while parsing to CST: internal error"
 
-    let errorExpectedButGot expected lexemes =
-        let { expected = expected; got = got } = expectedButGot expected lexemes
-        raise <| CstParserError {| expected = expected; got = got; |}
+    let errorExpectedButGot err =
+        let { expected = expected; got = got } = err
+        CstParserError {| expected = expected; got = got; |}
 
     module ParseType =
         let rec private typeName = parseSeq {
@@ -253,105 +268,59 @@ module CstParser =
                          Cst.result = toTupleType result }
             }
 
-    open ParseType
+    module ParseModule = 
 
-    let parse (lexemes: Lexeme list) : Cst.TopLevel =
+        let constDefinition = parseSeq {
+            do! tryMatchEq (Lexeme.Identifier "const")
+            let! name = matchIdentifier "constant name after const keyword"
+            do! matchEq (Lexeme.Operator ":") "colon after constant name in constant definition"
+            let! constType = failIfNoMatch ParseType.tryType "constant type after colon in constant definition"
+            do! matchEq (Lexeme.Operator ":=") "assignment operator after constant type in constant definition"
+            let! intValue = matchInt "constant value after assignment operator in constant definition"
+            do! matchEq Lexeme.Semicolon "semicolon after constant definition"
+
+            let constantDefinition =
+                { Cst.ConstDefinition.name = name
+                  Cst.ConstDefinition.type_ = constType
+                  Cst.ConstDefinition.value = Cst.IntVal intValue }
+            return constantDefinition }
+
+        let funDefinition = parseSeq {
+            do! tryMatchEq (Lexeme.Identifier "fun")
+            let! name = matchIdentifier "function name after fun keyword"
+            do! matchEq (Lexeme.Operator ":") "colon after function name in function definition"
+            let! funType = ParseType.funType
+            do! matchEq Lexeme.LeftCurly "function body after function type in function definition"
+            do! matchEq Lexeme.RightCurly "closing curly bracket after function body in function definition"
+
+            let functionDefinition =
+                {| name = name
+                   type_ = { Cst.arguments = funType.arguments; Cst.result = funType.result }
+                   body = Cst.FunBody []
+                   attributes = Cst.AttrLists [] |}
+            return functionDefinition }
 
 
-        let constDefinition lexemes =
+        let moduleBodyItem = tryParsers [
+            parseSeq { let! constDef = constDefinition in return Cst.ConstDefinition constDef }
+            parseSeq { let! funDef = funDefinition in return Cst.FunDefinition funDef }
+        ]
 
-            let parser = parseSeq {
-                let! name = matchIdentifier "constant name after const keyword"
-                do! matchEq (Lexeme.Operator ":") "colon after constant name in constant definition"
-                let! constType = failIfNoMatch tryType "constant type after colon in constant definition"
-                do! matchEq (Lexeme.Operator ":=") "assignment operator after constant type in constant definition"
-                let! intValue = matchInt "constant value after assignment operator in constant definition"
-                do! matchEq Lexeme.Semicolon "semicolon after constant definition"
+        let moduleDefinition = parseSeq {
+            do! tryMatchEq (Lexeme.Identifier "module")
+            let! name = matchIdentifier "module name"
+            do! matchEq Lexeme.LeftCurly "module body"
+            let! items = many moduleBodyItem
+            do! matchEq Lexeme.RightCurly "module definition or closing curly bracket"
+            return { Cst.Module.name = name; Cst.Module.definitions = items } }
 
-                let constantDefinition =
-                    { Cst.ConstDefinition.name = name
-                      Cst.ConstDefinition.type_ = constType
-                      Cst.ConstDefinition.value = Cst.IntVal intValue }
-                return constantDefinition
-            }
+        let topLevel = parseSeq {
+            let! modules = many moduleDefinition
+            do! matchEof "module definition"
+            return Cst.TopLevel modules }
 
-            let parseResult = parser lexemes
-
-            match parseResult with
-            | Match result -> result
-            | NoMatch -> raise CstParserInternalError
-            | Error { expected = expected; got = got} -> raise <| CstParserError {| expected = expected; got = got; |}
-
-        let funDefinition lexemes =
-
-            let parser = parseSeq {
-                let! name = matchIdentifier "function name after fun keyword"
-                do! matchEq (Lexeme.Operator ":") "colon after function name in function definition"
-                let! funType = funType
-                do! matchEq Lexeme.LeftCurly "function body after function type in function definition"
-                do! matchEq Lexeme.RightCurly "closing curly bracket after function body in function definition"
-
-                let functionDefinition =
-                    {| name = name
-                       type_ = { Cst.arguments = funType.arguments; Cst.result = funType.result }
-                       body = Cst.FunBody []
-                       attributes = Cst.AttrLists [] |}
-                return functionDefinition
-            }
-
-            let parseResult = parser lexemes
-
-            match parseResult with
-            | Match result -> result
-            | NoMatch -> raise CstParserInternalError
-            | Error { expected = expected; got = got} -> raise <| CstParserError {| expected = expected; got = got; |}
-
-        let moduleBody lexemes =
-
-            let moduleBodyItems = ResizeArray<Cst.ModuleTopLevel>()
-
-            let rec moduleBodyItem lexemes =
-                match lexemes with
-                | Lexeme.Identifier "const" :: rest ->
-                    let rest, definition = constDefinition rest
-                    moduleBodyItems.Add <| Cst.ConstDefinition definition
-                    moduleBodyItem rest
-                | Lexeme.Identifier "fun" :: rest ->
-                    let rest, definition = funDefinition rest
-                    moduleBodyItems.Add <| Cst.FunDefinition definition
-                    moduleBodyItem rest
-                | Lexeme.RightCurly :: _ -> lexemes
-                | other -> errorExpectedButGot "closing curly bracket after module body" other
-
-            let rest = moduleBodyItem lexemes
-            List.ofSeq moduleBodyItems, rest
-
-        let moduleDefinition lexemes =
-            match lexemes with
-            | Lexeme.Identifier name :: rest ->
-                match rest with
-                | Lexeme.LeftCurly :: rest ->
-                    let definitions, rest = moduleBody rest
-                    match rest with
-                    | Lexeme.RightCurly :: rest -> { Cst.Module.name = name; Cst.definitions = definitions }, rest
-                    | other -> errorExpectedButGot "closing curly bracket after module body" other
-                | other -> errorExpectedButGot "opening curly bracket after module name" other
-            | other -> errorExpectedButGot "module name after module keyword" other
-
-        let topLevel lexemes =
-
-            let modules = ResizeArray<Cst.Module>()
-
-            let rec topLevelItem lexemes =
-                match lexemes with
-                | [] -> ()
-                | Lexeme.Identifier "module" :: rest ->
-                    let module_, rest = moduleDefinition rest
-                    modules.Add module_
-                    topLevelItem rest
-                | other -> errorExpectedButGot "module definition at top level" other
-
-            topLevelItem lexemes
-            Cst.TopLevel <| List.ofSeq modules
-
-        topLevel lexemes
+    let parse lexemes =
+        match ParseModule.topLevel lexemes with
+        | Match (_, result) -> result
+        | NoMatch -> raise CstParserInternalError
+        | Error err -> raise <| errorExpectedButGot err
