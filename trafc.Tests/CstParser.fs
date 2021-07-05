@@ -168,3 +168,95 @@ let ``Parse empty function definition`` () =
                                    Lexeme.RightCurly
                                    Lexeme.RightCurly ]
     test <@ expected = actual @>
+
+[<Fact>]
+let ``Parse function definition with simple types`` () =
+    let definitions =
+      [ Cst.FunDefinition
+            {|
+                name = "F"
+                type_ = { arguments = Cst.TupleType [ {| name = None; type_ = Cst.TypeName "int16" |} ]
+                          result = Cst.TupleType [ {| name = None; type_ = Cst.TypeName "int32" |} ] }
+                body = Cst.FunBody []
+                attributes = Cst.AttrLists []
+            |} ]
+    let expected = Cst.TopLevel [ { name = "Mod"; definitions = definitions } ]
+    let actual = CstParser.parse [ Lexeme.Identifier "module"
+                                   Lexeme.Identifier "Mod"
+                                   Lexeme.LeftCurly
+                                   Lexeme.Identifier "fun"
+                                   Lexeme.Identifier "F"
+                                   Lexeme.Operator ":"
+                                   Lexeme.Identifier "int16"
+                                   Lexeme.Operator "->"
+                                   Lexeme.Identifier "int32"
+                                   Lexeme.LeftCurly
+                                   Lexeme.RightCurly
+                                   Lexeme.RightCurly ]
+    test <@ expected = actual @>
+
+[<Fact>]
+let ``Parse function definition with simple types in brackets`` () =
+    let definitions =
+      [ Cst.FunDefinition
+            {|
+                name = "F"
+                type_ = { arguments = Cst.TupleType [ {| name = None; type_ = Cst.TypeName "int16" |} ]
+                          result = Cst.TupleType [ {| name = None; type_ = Cst.TypeName "int32" |} ] }
+                body = Cst.FunBody []
+                attributes = Cst.AttrLists []
+            |} ]
+    let expected = Cst.TopLevel [ { name = "Mod"; definitions = definitions } ]
+    let actual = CstParser.parse [ Lexeme.Identifier "module"
+                                   Lexeme.Identifier "Mod"
+                                   Lexeme.LeftCurly
+                                   Lexeme.Identifier "fun"
+                                   Lexeme.Identifier "F"
+                                   Lexeme.Operator ":"
+                                   Lexeme.LeftBracket
+                                   Lexeme.Identifier "int16"
+                                   Lexeme.RightBracket
+                                   Lexeme.Operator "->"
+                                   Lexeme.LeftBracket
+                                   Lexeme.Identifier "int32"
+                                   Lexeme.RightBracket
+                                   Lexeme.LeftCurly
+                                   Lexeme.RightCurly
+                                   Lexeme.RightCurly ]
+    test <@ expected = actual @>
+
+[<Fact>]
+let ``Parse function definition with complex types`` () =
+    let definitions =
+      [ Cst.FunDefinition
+            {|
+                name = "F"
+                type_ = { arguments = Cst.TupleType [ {| name = None; type_ = Cst.TypeName "int8" |}
+                                                      {| name = None; type_ = Cst.TypeName "int16" |} ]
+                          result = Cst.TupleType [ {| name = None; type_ = Cst.TypeName "int32" |} 
+                                                   {| name = None; type_ = Cst.TypeName "int64" |} ] }
+                body = Cst.FunBody []
+                attributes = Cst.AttrLists []
+            |} ]
+    let expected = Cst.TopLevel [ { name = "Mod"; definitions = definitions } ]
+    let actual = CstParser.parse [ Lexeme.Identifier "module"
+                                   Lexeme.Identifier "Mod"
+                                   Lexeme.LeftCurly
+                                   Lexeme.Identifier "fun"
+                                   Lexeme.Identifier "F"
+                                   Lexeme.Operator ":"
+                                   Lexeme.LeftBracket
+                                   Lexeme.Identifier "int8"
+                                   Lexeme.Comma
+                                   Lexeme.Identifier "int16"
+                                   Lexeme.RightBracket
+                                   Lexeme.Operator "->"
+                                   Lexeme.LeftBracket
+                                   Lexeme.Identifier "int32"
+                                   Lexeme.Comma
+                                   Lexeme.Identifier "int64"
+                                   Lexeme.RightBracket
+                                   Lexeme.LeftCurly
+                                   Lexeme.RightCurly
+                                   Lexeme.RightCurly ]
+    test <@ expected = actual @>

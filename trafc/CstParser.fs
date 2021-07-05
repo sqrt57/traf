@@ -169,91 +169,94 @@ module CstParser =
         let { expected = expected; got = got } = expectedButGot expected lexemes
         raise <| CstParserError {| expected = expected; got = got; |}
 
-    let parse (lexemes: Lexeme list) : Cst.TopLevel =
+    module ParseType =
+        let rec private typeName = parseSeq {
+            let! typeName = tryMatchIdentifier
+            return Cst.TypeName typeName }
 
-        let rec tryType (lexemes: Lexeme list) : ParseResult<Lexeme list * Cst.Type, ExpectedButGot<Lexeme>> =
+        and private pointerType = parseSeq {
+            do! tryMatchEq Lexeme.Caret
+            let! pointerType = failIfNoMatch anyType "type in pointer type"
+            return Cst.Pointer pointerType }
 
-            let typeName = parseSeq {
-                let! typeName = tryMatchIdentifier
-                return Cst.TypeName typeName }
+        and private arrayType = parseSeq {
+            do! tryMatchEq Lexeme.LeftSquare
+            let! size = maybeParse
+                            ( parseSeq {
+                                let! intValue = tryMatchInt
+                                return Some <| Cst.IntVal intValue} )
+                            None 
+            do! matchEq Lexeme.RightSquare "closing square bracket in array type"
+            let! arrayType = failIfNoMatch anyType "array element type"
+            return Cst.Array {| type_ = arrayType; size = size; |} }
 
-            let pointerType = parseSeq {
-                do! tryMatchEq Lexeme.Caret
-                let! pointerType = failIfNoMatch tryType "type in pointer type"
-                return Cst.Pointer pointerType }
+        and private typeCloseBrackets elements =
+            tryParsers [
+                parseSeq {
+                    do! tryMatchEq Lexeme.Comma
+                    let! nextType = failIfNoMatch anyType "type in tuple type"
+                    let newElements = {| name = None; type_ = nextType; |} :: elements
+                    return! typeCloseBrackets newElements }
+                parseSeq {
+                    do! matchEq Lexeme.RightBracket "closing bracket in tuple type"
+                    return elements |> List.rev |> Cst.TupleType |> Cst.Type.Tuple }
+            ]
 
-            let arrayType = parseSeq {
-                do! tryMatchEq Lexeme.LeftSquare
-                let! size = maybeParse
-                                ( parseSeq {
-                                    let! intValue = tryMatchInt
-                                    return Some <| Cst.IntVal intValue} )
-                                None 
-                do! matchEq Lexeme.RightSquare "closing square bracket in array type"
-                let! arrayType = failIfNoMatch tryType "array element type"
-                return Cst.Array {| type_ = arrayType; size = size; |} }
+        and private typeBrackets = parseSeq {
+            do! tryMatchEq Lexeme.LeftBracket
+            return! tryParsers [
+                parseSeq {
+                    let! firstType = anyType
+                    let! tupleType = typeCloseBrackets [ {| name = None; type_ = firstType |} ]
+                    return tupleType }
+                parseSeq {
+                    do! matchEq Lexeme.RightBracket "type or right bracket in tuple type"
+                    return [] |> Cst.TupleType |> Cst.Type.Tuple }
+            ] }
 
-            let rec typeCloseBrackets elements =
-                tryParsers [
-                    parseSeq {
-                        do! tryMatchEq Lexeme.Comma
-                        let! nextType = failIfNoMatch tryType "type in tuple type"
-                        let newElements = {| name = None; type_ = nextType; |} :: elements
-                        return! typeCloseBrackets newElements }
-                    parseSeq {
-                        do! matchEq Lexeme.RightBracket "closing bracket in tuple type"
-                        return elements |> List.rev |> Cst.TupleType |> Cst.Type.Tuple }
-                ]
+        and private nonFunType =
+            tryParsers
+                [ typeName
+                  pointerType
+                  arrayType
+                  typeBrackets ]
 
-            let typeBrackets = parseSeq {
-                do! tryMatchEq Lexeme.LeftBracket
+        and private toTupleType = function
+            | Cst.Type.Tuple tt -> tt
+            | t -> Cst.TupleType [ {| name = None; type_ = t|} ]
+
+        and private anyType =
+            parseSeq {
+                let! arguments = nonFunType
                 return! tryParsers [
                     parseSeq {
-                        let! firstType = tryType
-                        let! tupleType = typeCloseBrackets [ {| name = None; type_ = firstType |} ]
-                        return tupleType }
+                        do! tryMatchEq (Lexeme.Operator "->")
+                        let! result = failIfNoMatch nonFunType ""
+                        return Cst.Fun { arguments = toTupleType arguments
+                                         result = toTupleType result }
+                    }
                     parseSeq {
-                        do! matchEq Lexeme.RightBracket "type or right bracket in tuple type"
-                        return [] |> Cst.TupleType |> Cst.Type.Tuple }
-                ] }
+                        return arguments
+                    }
+                ]
+            }
 
-            let nonFunType =
-                tryParsers
-                  [ typeName
-                    pointerType
-                    arrayType
-                    typeBrackets ]
-
-            let toTupleType = function
-                | Cst.Type.Tuple tt -> tt
-                | t -> Cst.TupleType [ {| name = None; type_ = t|} ]
-
-            let funType =
-                parseSeq {
-                    let! arguments = failIfNoMatch nonFunType "type in function arguments type"
-                    do! matchEq (Lexeme.Operator "->") "->"
-                    let! result = failIfNoMatch nonFunType "type in function result type"
-                    return Cst.Fun { arguments = toTupleType arguments
-                                     result = toTupleType result }
-                }
-
-            let anyType =
-                parseSeq {
-                    let! arguments = nonFunType
-                    return! tryParsers [
-                        parseSeq {
-                            do! tryMatchEq (Lexeme.Operator "->")
-                            let! result = failIfNoMatch nonFunType ""
-                            return Cst.Fun { arguments = toTupleType arguments
-                                             result = toTupleType result }
-                        }
-                        parseSeq {
-                            return arguments
-                        }
-                    ]
-                }
-
+        let tryType (lexemes: Lexeme list) : ParseResult<Lexeme list * Cst.Type, ExpectedButGot<Lexeme>> =
             anyType lexemes
+
+        let funType =
+            parseSeq {
+                let! arguments = failIfNoMatch nonFunType "type in function arguments type"
+                do! matchEq (Lexeme.Operator "->") "->"
+                let! result = failIfNoMatch nonFunType "type in function result type"
+                return { Cst.arguments = toTupleType arguments
+                         Cst.result = toTupleType result }
+            }
+
+    open ParseType
+
+    let parse (lexemes: Lexeme list) : Cst.TopLevel =
+
 
         let constDefinition lexemes =
 
@@ -284,13 +287,13 @@ module CstParser =
             let parser = parseSeq {
                 let! name = matchIdentifier "function name after fun keyword"
                 do! matchEq (Lexeme.Operator ":") "colon after function name in function definition"
-                let! funType = failIfNoMatch tryType "function type after colon in constant definition"
+                let! funType = funType
                 do! matchEq Lexeme.LeftCurly "function body after function type in function definition"
                 do! matchEq Lexeme.RightCurly "closing curly bracket after function body in function definition"
 
                 let functionDefinition =
                     {| name = name
-                       type_ = { Cst.arguments = Cst.TupleType []; Cst.result = Cst.TupleType [] }
+                       type_ = { Cst.arguments = funType.arguments; Cst.result = funType.result }
                        body = Cst.FunBody []
                        attributes = Cst.AttrLists [] |}
                 return functionDefinition
