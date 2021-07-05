@@ -55,7 +55,14 @@ module Cst =
 
 module ParserHelper =
 
-    type Parser<'lex, 'value, 'err> = 'lex list -> Result<'lex list * 'value, 'err>
+    type ParseResult<'value, 'err> =
+        | Match of 'value
+        | NoMatch
+        | Error of 'err
+
+    type Parser<'lex, 'value, 'err> = 'lex list -> ParseResult<'lex list * 'value, 'err>
+
+    type ExpectedButGot<'lex> = { expected: string; got: 'lex option }
 
     type ParseSeqBuilder() =
 
@@ -64,58 +71,85 @@ module ParserHelper =
                          : Parser<'lex, 'y, 'err> =
             fun lexemes ->
                 match x lexemes with
-                | Ok (lexemes, value) -> f value lexemes
+                | Match (lexemes, value) -> f value lexemes
+                | NoMatch -> NoMatch
                 | Error err -> Error err
 
         member this.Return(x: 'x) : Parser<'lex, 'x, 'err> =
-            fun lexemes -> Ok (lexemes, x)
+            fun lexemes -> Match (lexemes, x)
 
         member this.ReturnFrom(x: Parser<'lex, 'x, 'err>) : Parser<'lex, 'x, 'err> = x
 
     let parseSeq = ParseSeqBuilder()
 
-    let failWith error lexemes = Error error
+    let failWith error = Error error
 
     let expectedButGot expected lexemes =
         match lexemes with 
-        | lexeme :: _ -> expected, Some lexeme
-        | [] -> expected, None
+        | lexeme :: _ -> { expected = expected; got = Some lexeme }
+        | [] -> { expected = expected; got = None }
+
+    let failExpectedButGot expected lexemes = Error <| expectedButGot expected lexemes
 
     let matchEq value expected lexemes =
         match lexemes with
-        | x :: rest when x = value -> Ok (rest, ())
-        | other -> failWith (expectedButGot expected other) other
+        | x :: rest when x = value -> Match (rest, ())
+        | other -> failWith (expectedButGot expected other)
+
+    let tryMatchEq value lexemes =
+        match lexemes with
+        | x :: rest when x = value -> Match (rest, ())
+        | _ -> NoMatch
 
     let matchIdentifier expected lexemes =
         match lexemes with
-        | (Lexeme.Identifier identifier) :: rest -> Ok (rest, identifier)
-        | other -> failWith (expectedButGot expected other) other
+        | (Lexeme.Identifier identifier) :: rest -> Match (rest, identifier)
+        | other -> failWith (expectedButGot expected other)
+
+    let tryMatchIdentifier lexemes =
+        match lexemes with
+        | (Lexeme.Identifier identifier) :: rest -> Match (rest, identifier)
+        | _ -> NoMatch
 
     let matchInt expected lexemes =
         match lexemes with
-        | (Lexeme.Int intValue) :: rest -> Ok (rest, intValue)
-        | other -> failWith (expectedButGot expected other) other
+        | (Lexeme.Int intValue) :: rest -> Match (rest, intValue)
+        | other -> failWith (expectedButGot expected other)
+
+    let tryMatchInt lexemes =
+        match lexemes with
+        | (Lexeme.Int intValue) :: rest -> Match (rest, intValue)
+        | _ -> NoMatch
 
     let matchFilter filter expected lexemes =
         match lexemes with
         | (x :: rest) as lexemes ->
             match filter x with
-            | Some x -> Ok (rest, x)
-            | None -> failWith (expectedButGot expected lexemes) lexemes
-        | other -> failWith (expectedButGot expected other) other
+            | Some x -> Match (rest, x)
+            | None -> failWith (expectedButGot expected lexemes)
+        | other -> failWith (expectedButGot expected other)
 
     let maybeParse parser defaultValue lexemes =
         match parser lexemes with
-        | Ok (rest, value) -> Ok (rest, value)
-        | Error _ -> Ok (lexemes, defaultValue)
+        | Match m -> Match m
+        | NoMatch -> Match (lexemes, defaultValue)
+        | Error err -> Error err
 
-    let rec tryParsers err parsers lexemes =
+    let rec tryParsers parsers lexemes =
         match parsers with
         | parser :: rest ->
             match parser lexemes with
-            | Ok (rest, value) -> Ok (rest, value)
-            | Error _ -> tryParsers err rest lexemes
-        | [] -> Error <| expectedButGot err lexemes
+            | Match m -> Match m
+            | NoMatch -> tryParsers rest lexemes
+            | Error err -> Error err
+        | [] -> NoMatch
+
+    let failIfNoMatch parser err lexemes =
+        match parser lexemes with
+        | Match m -> Match m
+        | NoMatch -> Error <| expectedButGot err lexemes
+        | Error e -> Error e
+
 
 module CstParser =
 
@@ -127,60 +161,64 @@ module CstParser =
                 sprintf "Error while parsing to CST: Expected %s but got %O"
                     this.Data0.expected this.Data0.got
 
+    exception CstParserInternalError
+        with
+            override this.Message = "Error while parsing to CST: internal error"
+
     let errorExpectedButGot expected lexemes =
-        let (expected, got) = expectedButGot expected lexemes
+        let { expected = expected; got = got } = expectedButGot expected lexemes
         raise <| CstParserError {| expected = expected; got = got; |}
 
     let parse (lexemes: Lexeme list) : Cst.TopLevel =
 
-        let rec type_ err =
+        let rec tryType (lexemes: Lexeme list) : ParseResult<Lexeme list * Cst.Type, ExpectedButGot<Lexeme>> =
 
             let typeName = parseSeq {
-                let! typeName = matchIdentifier err
+                let! typeName = tryMatchIdentifier
                 return Cst.TypeName typeName }
 
             let pointerType = parseSeq {
-                do! matchEq Lexeme.Caret err
-                let! pointerType = type_ err
+                do! tryMatchEq Lexeme.Caret
+                let! pointerType = failIfNoMatch tryType "type in pointer type"
                 return Cst.Pointer pointerType }
 
             let arrayType = parseSeq {
-                do! matchEq Lexeme.LeftSquare err
+                do! tryMatchEq Lexeme.LeftSquare
                 let! size = maybeParse
                                 ( parseSeq {
-                                    let! intValue = matchInt err
+                                    let! intValue = tryMatchInt
                                     return Some <| Cst.IntVal intValue} )
                                 None 
-                do! matchEq Lexeme.RightSquare err
-                let! pointerType = type_ err
-                return Cst.Array {| type_ = pointerType; size = size; |} }
+                do! matchEq Lexeme.RightSquare "closing square bracket in array type"
+                let! arrayType = failIfNoMatch tryType "array element type"
+                return Cst.Array {| type_ = arrayType; size = size; |} }
 
             let rec typeCloseBrackets elements =
-                tryParsers err [
+                tryParsers [
                     parseSeq {
-                        do! matchEq Lexeme.Comma err
-                        let! nextType = type_ err
+                        do! tryMatchEq Lexeme.Comma
+                        let! nextType = failIfNoMatch tryType "type in tuple type"
                         let newElements = {| name = None; type_ = nextType; |} :: elements
                         return! typeCloseBrackets newElements }
                     parseSeq {
-                        do! matchEq Lexeme.RightBracket err
+                        do! matchEq Lexeme.RightBracket "closing bracket in tuple type"
                         return elements |> List.rev |> Cst.TupleType |> Cst.Type.Tuple }
                 ]
 
             let typeBrackets = parseSeq {
-                do! matchEq Lexeme.LeftBracket err
-                return! tryParsers err [
+                do! tryMatchEq Lexeme.LeftBracket
+                return! tryParsers [
                     parseSeq {
-                        do! matchEq Lexeme.RightBracket err
-                        return [] |> Cst.TupleType |> Cst.Type.Tuple }
-                    parseSeq {
-                        let! firstType = type_ err
-                        let! tupleType = typeCloseBrackets [ {| name= None; type_ = firstType |} ]
+                        let! firstType = tryType
+                        let! tupleType = typeCloseBrackets [ {| name = None; type_ = firstType |} ]
                         return tupleType }
+                    parseSeq {
+                        do! matchEq Lexeme.RightBracket "type or right bracket in tuple type"
+                        return [] |> Cst.TupleType |> Cst.Type.Tuple }
                 ] }
 
             let nonFunType =
-                tryParsers err
+                tryParsers
                   [ typeName
                     pointerType
                     arrayType
@@ -192,23 +230,37 @@ module CstParser =
 
             let funType =
                 parseSeq {
-                    let! arguments = nonFunType
-                    do! matchEq (Lexeme.Operator "->") ""
-                    let! result = type_ err
+                    let! arguments = failIfNoMatch nonFunType "type in function arguments type"
+                    do! matchEq (Lexeme.Operator "->") "->"
+                    let! result = failIfNoMatch nonFunType "type in function result type"
                     return Cst.Fun { arguments = toTupleType arguments
                                      result = toTupleType result }
                 }
 
-            tryParsers err
-              [ funType
-                nonFunType ]
+            let anyType =
+                parseSeq {
+                    let! arguments = nonFunType
+                    return! tryParsers [
+                        parseSeq {
+                            do! tryMatchEq (Lexeme.Operator "->")
+                            let! result = failIfNoMatch nonFunType ""
+                            return Cst.Fun { arguments = toTupleType arguments
+                                             result = toTupleType result }
+                        }
+                        parseSeq {
+                            return arguments
+                        }
+                    ]
+                }
+
+            anyType lexemes
 
         let constDefinition lexemes =
 
             let parser = parseSeq {
                 let! name = matchIdentifier "constant name after const keyword"
                 do! matchEq (Lexeme.Operator ":") "colon after constant name in constant definition"
-                let! constType = type_ "constant type after colon in constant definition"
+                let! constType = failIfNoMatch tryType "constant type after colon in constant definition"
                 do! matchEq (Lexeme.Operator ":=") "assignment operator after constant type in constant definition"
                 let! intValue = matchInt "constant value after assignment operator in constant definition"
                 do! matchEq Lexeme.Semicolon "semicolon after constant definition"
@@ -223,15 +275,16 @@ module CstParser =
             let parseResult = parser lexemes
 
             match parseResult with
-            | Ok result -> result
-            | Error (expected, got) -> raise <| CstParserError {| expected = expected; got = got; |}
+            | Match result -> result
+            | NoMatch -> raise CstParserInternalError
+            | Error { expected = expected; got = got} -> raise <| CstParserError {| expected = expected; got = got; |}
 
         let funDefinition lexemes =
 
             let parser = parseSeq {
                 let! name = matchIdentifier "function name after fun keyword"
                 do! matchEq (Lexeme.Operator ":") "colon after function name in function definition"
-                let! funType = type_ "function type after colon in constant definition"
+                let! funType = failIfNoMatch tryType "function type after colon in constant definition"
                 do! matchEq Lexeme.LeftCurly "function body after function type in function definition"
                 do! matchEq Lexeme.RightCurly "closing curly bracket after function body in function definition"
 
@@ -246,8 +299,9 @@ module CstParser =
             let parseResult = parser lexemes
 
             match parseResult with
-            | Ok result -> result
-            | Error (expected, got) -> raise <| CstParserError {| expected = expected; got = got; |}
+            | Match result -> result
+            | NoMatch -> raise CstParserInternalError
+            | Error { expected = expected; got = got} -> raise <| CstParserError {| expected = expected; got = got; |}
 
         let moduleBody lexemes =
 
