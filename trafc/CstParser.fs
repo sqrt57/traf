@@ -189,12 +189,12 @@ module CstParser =
             let! typeName = tryMatchIdentifier
             return Cst.TypeName typeName }
 
-        and private pointerType = parseSeq {
+        and private pointerType lexemes = (parseSeq {
             do! tryMatchEq Lexeme.Caret
             let! pointerType = failIfNoMatch anyType "type in pointer type"
-            return Cst.Pointer pointerType }
+            return Cst.Pointer pointerType } ) lexemes
 
-        and private arrayType = parseSeq {
+        and private arrayType lexemes = (parseSeq {
             do! tryMatchEq Lexeme.LeftSquare
             let! size = maybeParse
                             ( parseSeq {
@@ -203,7 +203,7 @@ module CstParser =
                             None 
             do! matchEq Lexeme.RightSquare "closing square bracket in array type"
             let! arrayType = failIfNoMatch anyType "array element type"
-            return Cst.Array {| type_ = arrayType; size = size; |} }
+            return Cst.Array {| type_ = arrayType; size = size; |} } ) lexemes
 
         and private typeCloseBrackets elements =
             tryParsers [
@@ -217,11 +217,11 @@ module CstParser =
                     return elements |> List.rev |> Cst.TupleType |> Cst.Type.Tuple }
             ]
 
-        and private typeTupleItem = parseSeq {
+        and private typeTupleItem lexeme = (parseSeq {
             let! type_ = anyType
-            return {| name = None; type_ = type_; |} }
+            return {| name = None; type_ = type_; |} } ) lexeme
 
-        and private typeBrackets = parseSeq {
+        and private typeBrackets lexeme = (parseSeq {
             do! tryMatchEq Lexeme.LeftBracket
             let! typeItems = tryParsers [
                 parseSeq {
@@ -235,7 +235,7 @@ module CstParser =
                     return first :: rest }
                 parseSeq { return [] }] 
             do! matchEq Lexeme.RightBracket "next type or right bracket in type tuple"
-            return typeItems |> Cst.TupleType |> Cst.Type.Tuple}
+            return typeItems |> Cst.TupleType |> Cst.Type.Tuple } ) lexeme
 
         and private nonFunType = tryParsers [
             typeName
@@ -247,7 +247,7 @@ module CstParser =
             | Cst.Type.Tuple tt -> tt
             | t -> Cst.TupleType [ {| name = None; type_ = t|} ]
 
-        and private anyType = parseSeq {
+        and private anyType lexemes = (parseSeq {
             let! arguments = nonFunType
             return! tryParsers [
                 parseSeq {
@@ -255,7 +255,7 @@ module CstParser =
                     let! result = failIfNoMatch nonFunType "return type"
                     return Cst.Fun { arguments = toTupleType arguments
                                      result = toTupleType result } }
-                parseSeq { return arguments } ] }
+                parseSeq { return arguments } ] } ) lexemes
 
         let tryType (lexemes: Lexeme list) : ParseResult<Lexeme list * Cst.Type, ExpectedButGot<Lexeme>> =
             anyType lexemes
