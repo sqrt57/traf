@@ -217,56 +217,55 @@ module CstParser =
                     return elements |> List.rev |> Cst.TupleType |> Cst.Type.Tuple }
             ]
 
+        and private typeTupleItem = parseSeq {
+            let! type_ = anyType
+            return {| name = None; type_ = type_; |} }
+
         and private typeBrackets = parseSeq {
             do! tryMatchEq Lexeme.LeftBracket
-            return! tryParsers [
+            let! typeItems = tryParsers [
                 parseSeq {
-                    let! firstType = anyType
-                    let! tupleType = typeCloseBrackets [ {| name = None; type_ = firstType |} ]
-                    return tupleType }
-                parseSeq {
-                    do! matchEq Lexeme.RightBracket "type or right bracket in tuple type"
-                    return [] |> Cst.TupleType |> Cst.Type.Tuple }
-            ] }
+                    let! first = typeTupleItem
+                    let! rest = many (parseSeq {
+                        do! tryMatchEq Lexeme.Comma
+                        return! typeTupleItem } )
+                    do! tryParsers [
+                        tryMatchEq Lexeme.Comma
+                        parseSeq { return () } ]
+                    return first :: rest }
+                parseSeq { return [] }] 
+            do! matchEq Lexeme.RightBracket "next type or right bracket in type tuple"
+            return typeItems |> Cst.TupleType |> Cst.Type.Tuple}
 
-        and private nonFunType =
-            tryParsers
-                [ typeName
-                  pointerType
-                  arrayType
-                  typeBrackets ]
+        and private nonFunType = tryParsers [
+            typeName
+            pointerType
+            arrayType
+            typeBrackets ]
 
         and private toTupleType = function
             | Cst.Type.Tuple tt -> tt
             | t -> Cst.TupleType [ {| name = None; type_ = t|} ]
 
-        and private anyType =
-            parseSeq {
-                let! arguments = nonFunType
-                return! tryParsers [
-                    parseSeq {
-                        do! tryMatchEq (Lexeme.Operator "->")
-                        let! result = failIfNoMatch nonFunType ""
-                        return Cst.Fun { arguments = toTupleType arguments
-                                         result = toTupleType result }
-                    }
-                    parseSeq {
-                        return arguments
-                    }
-                ]
-            }
+        and private anyType = parseSeq {
+            let! arguments = nonFunType
+            return! tryParsers [
+                parseSeq {
+                    do! tryMatchEq (Lexeme.Operator "->")
+                    let! result = failIfNoMatch nonFunType "return type"
+                    return Cst.Fun { arguments = toTupleType arguments
+                                     result = toTupleType result } }
+                parseSeq { return arguments } ] }
 
         let tryType (lexemes: Lexeme list) : ParseResult<Lexeme list * Cst.Type, ExpectedButGot<Lexeme>> =
             anyType lexemes
 
-        let funType =
-            parseSeq {
-                let! arguments = failIfNoMatch nonFunType "type in function arguments type"
-                do! matchEq (Lexeme.Operator "->") "->"
-                let! result = failIfNoMatch nonFunType "type in function result type"
-                return { Cst.arguments = toTupleType arguments
-                         Cst.result = toTupleType result }
-            }
+        let funType = parseSeq {
+            let! arguments = failIfNoMatch nonFunType "type in function arguments type"
+            do! matchEq (Lexeme.Operator "->") "->"
+            let! result = failIfNoMatch nonFunType "type in function result type"
+            return { Cst.arguments = toTupleType arguments
+                     Cst.result = toTupleType result } }
 
     module ParseModule = 
 
