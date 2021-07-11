@@ -302,6 +302,20 @@ module CstParser =
                    attributes = Cst.AttrLists [] |}
             return functionDefinition }
 
+        let externFunDefinition = parseSeq {
+            do! tryMatchEq (Lexeme.Identifier "extern")
+            do! matchEq (Lexeme.Identifier "fun") "fun keyword after extern"
+            let! name = matchIdentifier "function name after fun keyword"
+            do! matchEq (Lexeme.Operator ":") "colon after function name in external function definition"
+            let! funType = ParseType.funType
+            do! matchEq Lexeme.Semicolon "semicolon after external function definition"
+
+            let externDefinition =
+                {| name = name
+                   type_ = { Cst.arguments = funType.arguments; Cst.result = funType.result }
+                   attributes = Cst.AttrLists [] |}
+            return externDefinition }
+
         let funAttr = parseSeq {
             let! name = tryMatchIdentifier
             let! value = maybeParse Cst.None (parseSeq {
@@ -322,25 +336,15 @@ module CstParser =
             do! matchEq Lexeme.RightSquare "attribute or right square bracket"
             return Cst.AttrList (first :: rest) }
 
-        let externFunDefinition = parseSeq {
-            do! tryMatchEq (Lexeme.Identifier "extern")
-            let! attrLists = many funAttrList
-            do! tryMatchEq (Lexeme.Identifier "fun")
-            let! name = matchIdentifier "function name after fun keyword"
-            do! matchEq (Lexeme.Operator ":") "colon after function name in external function definition"
-            let! funType = ParseType.funType
-            do! matchEq Lexeme.Semicolon "semicolon after external function definition"
-
-            let externDefinition =
-                {| name = name
-                   type_ = { Cst.arguments = funType.arguments; Cst.result = funType.result }
-                   attributes = Cst.AttrLists attrLists |}
-            return externDefinition }
+        let withAttrLists attributes = tryParsers [
+            parseSeq { let! funDef = funDefinition in return Cst.FunDefinition {| funDef with attributes = attributes |} }
+            parseSeq { let! externDef = externFunDefinition in return Cst.ExternFunDefinition {| externDef with attributes = attributes |} }
+        ]
 
         let moduleBodyItem = tryParsers [
             parseSeq { let! constDef = constDefinition in return Cst.ConstDefinition constDef }
-            parseSeq { let! funDef = funDefinition in return Cst.FunDefinition funDef }
-            parseSeq { let! externDef = externFunDefinition in return Cst.ExternFunDefinition externDef }
+            parseSeq { let! attrLists = many funAttrList in return! withAttrLists (Cst.AttrLists attrLists) }
+            withAttrLists (Cst.AttrLists [])
         ]
 
         let moduleDefinition = parseSeq {

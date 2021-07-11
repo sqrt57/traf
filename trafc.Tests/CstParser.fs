@@ -278,7 +278,6 @@ let ``Parse external function definition`` () =
     let actual = CstParser.parse [ Lexeme.Identifier "module"
                                    Lexeme.Identifier "Mod"
                                    Lexeme.LeftCurly
-                                   Lexeme.Identifier "extern"
                                    Lexeme.LeftSquare
                                    Lexeme.Identifier "dll_import"
                                    Lexeme.Operator "="
@@ -291,6 +290,7 @@ let ``Parse external function definition`` () =
                                    Lexeme.LeftSquare
                                    Lexeme.Identifier "std_call"
                                    Lexeme.RightSquare
+                                   Lexeme.Identifier "extern"
                                    Lexeme.Identifier "fun"
                                    Lexeme.Identifier "exit_process"
                                    Lexeme.Operator ":"
