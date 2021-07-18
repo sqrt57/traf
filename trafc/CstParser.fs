@@ -154,21 +154,37 @@ module ParserHelper =
             | Error err -> Error err
         | [] -> NoMatch
 
-    let failIfNoMatch parser err lexemes =
+    let failIfNoMatch parser expected lexemes =
         match parser lexemes with
         | Match m -> Match m
-        | NoMatch -> Error <| expectedButGot err lexemes
+        | NoMatch -> Error <| expectedButGot expected lexemes
         | Error e -> Error e
 
-    let many parser =
-        let rec manyImpl acc = tryParsers [
+    let fail expected lexemes =
+        Error <| expectedButGot expected lexemes
+
+    let zeroOrMore parser =
+        let rec zeroOrMoreImpl acc = tryParsers [
             parseSeq {
                 let! result = parser
-                return! manyImpl (result :: acc)
+                return! zeroOrMoreImpl (result :: acc)
             }
             parseSeq { return List.rev acc }
         ]
-        manyImpl []
+        zeroOrMoreImpl []
+
+    let oneOrMore parser =
+        let rec oneOrMoreImpl acc = tryParsers [
+            parseSeq {
+                let! result = parser
+                return! oneOrMoreImpl (result :: acc)
+            }
+            parseSeq { return List.rev acc }
+        ]
+        parseSeq {
+            let! first = parser
+            return! oneOrMoreImpl [first]
+        }
 
 
 module CstParser =
@@ -229,7 +245,7 @@ module CstParser =
             let! typeItems = tryParsers [
                 parseSeq {
                     let! first = typeTupleItem
-                    let! rest = many (parseSeq {
+                    let! rest = zeroOrMore (parseSeq {
                         do! tryMatchEq Lexeme.Comma
                         return! typeTupleItem } )
                     do! tryParsers [
@@ -287,18 +303,21 @@ module CstParser =
                   Cst.ConstDefinition.value = Cst.IntVal intValue }
             return constantDefinition }
 
+        let funBodyItem = tryParsers [ ]
+
         let funDefinition = parseSeq {
             do! tryMatchEq (Lexeme.Identifier "fun")
             let! name = matchIdentifier "function name after fun keyword"
             do! matchEq (Lexeme.Operator ":") "colon after function name in function definition"
             let! funType = ParseType.funType
             do! matchEq Lexeme.LeftCurly "function body after function type in function definition"
+            let! bodyItems = zeroOrMore funBodyItem
             do! matchEq Lexeme.RightCurly "closing curly bracket after function body in function definition"
 
             let functionDefinition =
                 {| name = name
                    type_ = { Cst.arguments = funType.arguments; Cst.result = funType.result }
-                   body = Cst.FunBody []
+                   body = Cst.FunBody bodyItems
                    attributes = Cst.AttrLists [] |}
             return functionDefinition }
 
@@ -330,7 +349,7 @@ module CstParser =
         let funAttrList = parseSeq {
             do! tryMatchEq Lexeme.LeftSquare
             let! first = funAttr
-            let! rest = many (parseSeq {
+            let! rest = zeroOrMore (parseSeq {
                 do! tryMatchEq Lexeme.Comma
                 return! funAttr } )
             do! matchEq Lexeme.RightSquare "attribute or right square bracket"
@@ -339,24 +358,26 @@ module CstParser =
         let withAttrLists attributes = tryParsers [
             parseSeq { let! funDef = funDefinition in return Cst.FunDefinition {| funDef with attributes = attributes |} }
             parseSeq { let! externDef = externFunDefinition in return Cst.ExternFunDefinition {| externDef with attributes = attributes |} }
+            parseSeq { return! fail "function definition after attributes" }
         ]
 
         let moduleBodyItem = tryParsers [
             parseSeq { let! constDef = constDefinition in return Cst.ConstDefinition constDef }
-            parseSeq { let! attrLists = many funAttrList in return! withAttrLists (Cst.AttrLists attrLists) }
-            withAttrLists (Cst.AttrLists [])
+            parseSeq { let! funDef = funDefinition in return Cst.FunDefinition funDef }
+            parseSeq { let! externDef = externFunDefinition in return Cst.ExternFunDefinition externDef }
+            parseSeq { let! attrLists = oneOrMore funAttrList in return! withAttrLists (Cst.AttrLists attrLists) }
         ]
 
         let moduleDefinition = parseSeq {
             do! tryMatchEq (Lexeme.Identifier "module")
             let! name = matchIdentifier "module name"
             do! matchEq Lexeme.LeftCurly "module body"
-            let! items = many moduleBodyItem
+            let! items = zeroOrMore moduleBodyItem
             do! matchEq Lexeme.RightCurly "module definition or closing curly bracket"
             return { Cst.Module.name = name; Cst.Module.definitions = items } }
 
         let topLevel = parseSeq {
-            let! modules = many moduleDefinition
+            let! modules = zeroOrMore moduleDefinition
             do! matchEof "module definition"
             return Cst.TopLevel modules }
 
