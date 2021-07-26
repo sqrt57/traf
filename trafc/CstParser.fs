@@ -37,10 +37,12 @@ module Cst =
     type ConstDefinition = { name: string; type_: Type; value: Expr; }
     type VariableDefinition = { name: string; type_: Type; value: Expr option; }
 
+    type Assignment = { name: string; value: Expr; }
+
     type Statement =
         | ConstStatement of ConstDefinition
         | VarStatement of VariableDefinition
-        | Assignment of {| name: string; value: Expr; |}
+        | Assignment of Assignment
         | Expression of Expr
     type FunBody = FunBody of Statement list
 
@@ -316,8 +318,20 @@ module CstParser =
                   Cst.VariableDefinition.value = None }
             return variableDefinition }
 
+        let assignment = parseSeq {
+            let! name = tryMatchIdentifier
+            do! tryMatchEq (Lexeme.Operator ":=")
+            let! intValue = matchInt "assignement value after assignment operator"
+            do! matchEq Lexeme.Semicolon "semicolon after assignment definition"
+
+            let assignment =
+                { Cst.Assignment.name = name
+                  Cst.Assignment.value = Cst.IntVal intValue }
+            return Cst.Assignment assignment }
+
         let funBodyItem = tryParsers [
-            parseSeq { let! varDef = varDefinition in return Cst.VarStatement varDef } ]
+            parseSeq { let! varDef = varDefinition in return Cst.VarStatement varDef }
+            assignment ]
 
         let funDefinition = parseSeq {
             do! tryMatchEq (Lexeme.Identifier "fun")

@@ -333,3 +333,34 @@ let ``Parse function definition with variable definition`` () =
                                    Lexeme.RightCurly
                                    Lexeme.RightCurly ]
     test <@ expected = actual @>
+
+[<Fact>]
+let ``Parse function definition with assignment`` () =
+    let definitions =
+      [ Cst.FunDefinition
+            {|
+                name = "F"
+                type_ = { arguments = Cst.TupleType []; result = Cst.TupleType [] }
+                body = Cst.FunBody [ Cst.Assignment { name = "x"; value = Cst.IntVal 5L; } ]
+                attributes = Cst.AttrLists []
+            |} ]
+    let expected = Cst.TopLevel [ { name = "Mod"; definitions = definitions } ]
+    let actual = CstParser.parse [ Lexeme.Identifier "module"
+                                   Lexeme.Identifier "Mod"
+                                   Lexeme.LeftCurly
+                                   Lexeme.Identifier "fun"
+                                   Lexeme.Identifier "F"
+                                   Lexeme.Operator ":"
+                                   Lexeme.LeftBracket
+                                   Lexeme.RightBracket
+                                   Lexeme.Operator "->"
+                                   Lexeme.LeftBracket
+                                   Lexeme.RightBracket
+                                   Lexeme.LeftCurly
+                                   Lexeme.Identifier "x"
+                                   Lexeme.Operator ":="
+                                   Lexeme.Int 5L
+                                   Lexeme.Semicolon
+                                   Lexeme.RightCurly
+                                   Lexeme.RightCurly ]
+    test <@ expected = actual @>
