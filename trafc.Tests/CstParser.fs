@@ -302,3 +302,34 @@ let ``Parse external function definition`` () =
                                    Lexeme.RightCurly ]
     test <@ expected = actual @>
 
+[<Fact>]
+let ``Parse function definition with variable definition`` () =
+    let definitions =
+      [ Cst.FunDefinition
+            {|
+                name = "F"
+                type_ = { arguments = Cst.TupleType []; result = Cst.TupleType [] }
+                body = Cst.FunBody [ Cst.VarStatement { name = "x"; type_ = Cst.TypeName "int32"; value = None } ]
+                attributes = Cst.AttrLists []
+            |} ]
+    let expected = Cst.TopLevel [ { name = "Mod"; definitions = definitions } ]
+    let actual = CstParser.parse [ Lexeme.Identifier "module"
+                                   Lexeme.Identifier "Mod"
+                                   Lexeme.LeftCurly
+                                   Lexeme.Identifier "fun"
+                                   Lexeme.Identifier "F"
+                                   Lexeme.Operator ":"
+                                   Lexeme.LeftBracket
+                                   Lexeme.RightBracket
+                                   Lexeme.Operator "->"
+                                   Lexeme.LeftBracket
+                                   Lexeme.RightBracket
+                                   Lexeme.LeftCurly
+                                   Lexeme.Identifier "var"
+                                   Lexeme.Identifier "x"
+                                   Lexeme.Operator ":"
+                                   Lexeme.Identifier "int32"
+                                   Lexeme.Semicolon
+                                   Lexeme.RightCurly
+                                   Lexeme.RightCurly ]
+    test <@ expected = actual @>

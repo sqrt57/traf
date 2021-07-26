@@ -303,7 +303,21 @@ module CstParser =
                   Cst.ConstDefinition.value = Cst.IntVal intValue }
             return constantDefinition }
 
-        let funBodyItem = tryParsers [ ]
+        let varDefinition = parseSeq {
+            do! tryMatchEq (Lexeme.Identifier "var")
+            let! name = matchIdentifier "variable name after var keyword"
+            do! matchEq (Lexeme.Operator ":") "colon after varibale name in variable definition"
+            let! varType = failIfNoMatch ParseType.tryType "variable type after colon in variable definition"
+            do! matchEq Lexeme.Semicolon "semicolon after variable definition"
+
+            let variableDefinition =
+                { Cst.VariableDefinition.name = name
+                  Cst.VariableDefinition.type_ = varType
+                  Cst.VariableDefinition.value = None }
+            return variableDefinition }
+
+        let funBodyItem = tryParsers [
+            parseSeq { let! varDef = varDefinition in return Cst.VarStatement varDef } ]
 
         let funDefinition = parseSeq {
             do! tryMatchEq (Lexeme.Identifier "fun")
