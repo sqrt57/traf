@@ -312,11 +312,18 @@ module CstParser =
             let result = Cst.Negate inner
             return result }
 
+        let addressOf innerParser = parseSeq {
+            do! tryMatchEq Lexeme.AtSign
+            let! inner = failIfNoMatch innerParser "expression after '@'"
+            let result = Cst.AddressOf inner
+            return result }
+
         let minimalExpression innerParser = tryParsers [
             intConst
             stringConst
             reference
             negate innerParser
+            addressOf innerParser
             brackets innerParser ]
 
         let funArgs innerParser = tryParsers [
