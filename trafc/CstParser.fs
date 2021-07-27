@@ -1,9 +1,5 @@
 namespace Triton
 
-open System
-open System.Text
-open System.Collections.Generic
-
 [<RequireQualifiedAccess>]
 module Cst =
 
