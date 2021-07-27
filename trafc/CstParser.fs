@@ -325,9 +325,22 @@ module CstParser =
                   Cst.Assignment.value = Cst.IntVal intValue }
             return Cst.Assignment assignment }
 
+        let funCall = parseSeq {
+            let! name = tryMatchIdentifier
+            do! tryMatchEq Lexeme.LeftBracket
+            do! matchEq Lexeme.RightBracket "right bracket after arguments list in function call"
+            do! matchEq Lexeme.Semicolon "semicolon after function call"
+
+            let expr =
+                Cst.FunCall
+                    {| func = Cst.Reference name
+                       arguments = [] |}
+            return expr }
+
         let funBodyItem = tryParsers [
             parseSeq { let! varDef = varDefinition in return Cst.VarStatement varDef }
-            assignment ]
+            assignment
+            parseSeq { let! expr = funCall in return Cst.Expression expr } ]
 
         let funDefinition = parseSeq {
             do! tryMatchEq (Lexeme.Identifier "fun")

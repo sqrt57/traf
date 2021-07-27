@@ -295,3 +295,13 @@ let ``Parse assignment inside function`` () =
         Lexeme.Int 5L
         Lexeme.Semicolon ]
     test <@ ParserHelper.Match ([], expected) = actual @>
+
+[<Fact>]
+let ``Parse function call inside function`` () =
+    let expected = Cst.Expression <| Cst.FunCall {| func = Cst.Reference "f"; arguments = []; |}
+    let actual = CstParser.ParseModule.funBodyItem [
+        Lexeme.Identifier "f"
+        Lexeme.LeftBracket
+        Lexeme.RightBracket
+        Lexeme.Semicolon ]
+    test <@ ParserHelper.Match ([], expected) = actual @>
