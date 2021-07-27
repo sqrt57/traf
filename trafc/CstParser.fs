@@ -291,7 +291,7 @@ module CstParser =
 
         let brackets innerParser = parseSeq {
             do! tryMatchEq Lexeme.LeftBracket
-            let! result = innerParser "expression inside brackets"
+            let! result = failIfNoMatch innerParser "expression inside brackets"
             do! matchEq Lexeme.RightBracket "matching closing bracket in expression"
             return result }
 
@@ -300,24 +300,35 @@ module CstParser =
             reference
             brackets innerParser ]
 
-        let continueFunCall func = parseSeq {
+        let funArgs innerParser = tryParsers [
+            parseSeq {
+                let! first = innerParser
+                let! rest = zeroOrMore (parseSeq {
+                    do! tryMatchEq Lexeme.Comma
+                    return! failIfNoMatch innerParser "function argument after comma" })
+                return first :: rest }
+            parseSeq { return [] } ]
+
+        let continueFunCall innerParser func = parseSeq {
             do! tryMatchEq Lexeme.LeftBracket
+            let! args = funArgs innerParser
             do! matchEq Lexeme.RightBracket "right bracket after arguments list in function call"
-            let result = Cst.FunCall {| func = func; arguments = []; |}
+            let result = Cst.FunCall {| func = func; arguments = args; |}
             return result }
 
-        let rec tryContinueExpression result = tryParsers [
+        let rec tryContinueExpression innerParser result = tryParsers [
             parseSeq {
-                let! funCallResult = continueFunCall result
-                return! tryContinueExpression funCallResult }
+                let! funCallResult = continueFunCall innerParser result
+                return! tryContinueExpression innerParser funCallResult }
             parseSeq { return result } ]
 
         let expressionRec innerParser = parseSeq {
             let! minimal = minimalExpression innerParser
-            return! tryContinueExpression minimal }
+            return! tryContinueExpression innerParser minimal }
 
-        let rec tryExpression lexemes = expressionRec expression lexemes
-        and expression expected = failIfNoMatch tryExpression expected
+        let rec tryExpression lexemes = expressionRec tryExpression lexemes
+
+        let expression expected = failIfNoMatch tryExpression expected
 
     module ParseModule = 
 

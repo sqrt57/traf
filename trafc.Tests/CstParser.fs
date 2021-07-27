@@ -318,3 +318,22 @@ let ``Function body: double function call`` () =
         Lexeme.RightBracket
         Lexeme.Semicolon ]
     test <@ ParserHelper.Match ([], expected) = actual @>
+
+[<Fact>]
+let ``Function body: nested function call`` () =
+    let funCallG = Cst.FunCall {| func = Cst.Reference "g"; arguments = []; |}
+    let funCallH = Cst.FunCall {| func = Cst.Reference "h"; arguments = []; |}
+    let expected = Cst.Expression <| Cst.FunCall {| func = Cst.Reference "f"; arguments = [funCallG; funCallH]; |}
+    let actual = CstParser.ParseModule.funBodyItem [
+        Lexeme.Identifier "f"
+        Lexeme.LeftBracket
+        Lexeme.Identifier "g"
+        Lexeme.LeftBracket
+        Lexeme.RightBracket
+        Lexeme.Comma
+        Lexeme.Identifier "h"
+        Lexeme.LeftBracket
+        Lexeme.RightBracket
+        Lexeme.RightBracket
+        Lexeme.Semicolon ]
+    test <@ ParserHelper.Match ([], expected) = actual @>
