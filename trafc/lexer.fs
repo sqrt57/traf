@@ -93,7 +93,7 @@ module Lexer =
         'f', 15L; 'F', 15L
     ]
 
-    let lex (source : string) : Lexeme array =
+    let lex (source : string) : Lexeme seq =
         let result = ResizeArray<Lexeme>()
 
         let rec processChar i =
@@ -295,4 +295,4 @@ module Lexer =
 
         processChar 0
 
-        result.ToArray()
+        result :> Lexeme seq

@@ -483,7 +483,7 @@ module CstParser =
             do! matchEof "module definition"
             return Cst.TopLevel modules }
 
-    let parse lexemes =
+    let parse (lexemes: Lexeme list) : Cst.TopLevel =
         match ParseModule.topLevel lexemes with
         | Match (_, result) -> result
         | NoMatch -> raise CstParserInternalError
