@@ -11,6 +11,8 @@ module Cst =
         | Null
         | FunCall of {| func: Expr; arguments: Expr list; |}
         | AddressOf of Expr
+        | Negate of Expr
+        | Operator of {| left: Expr; op: string; right: Expr; |}
 
     type TupleType = TupleType of {| name: string option; type_: Type |} list
     and FunType = { arguments: TupleType; result: TupleType }
@@ -295,9 +297,16 @@ module CstParser =
             do! matchEq Lexeme.RightBracket "matching closing bracket in expression"
             return result }
 
+        let negate innerParser = parseSeq {
+            do! tryMatchEq (Lexeme.Operator "-")
+            let! inner = failIfNoMatch innerParser "expression after '-'"
+            let result = Cst.Negate inner
+            return result }
+
         let minimalExpression innerParser = tryParsers [
             intConst
             reference
+            negate innerParser
             brackets innerParser ]
 
         let funArgs innerParser = tryParsers [

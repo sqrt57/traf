@@ -307,24 +307,38 @@ let ``Function body: function call`` () =
     test <@ ParserHelper.Match ([], expected) = actual @>
 
 [<Fact>]
-let ``Function body: double function call`` () =
+let ``Expression: integer constant`` () =
+    let expected = Cst.IntVal 10L
+    let actual = CstParser.ParseExpression.tryExpression [
+        Lexeme.Int 10L ]
+    test <@ ParserHelper.Match ([], expected) = actual @>
+
+[<Fact>]
+let ``Expression: negative integer constant`` () =
+    let expected = Cst.Negate <| Cst.IntVal 10L
+    let actual = CstParser.ParseExpression.tryExpression [
+        Lexeme.Operator "-"
+        Lexeme.Int 10L ]
+    test <@ ParserHelper.Match ([], expected) = actual @>
+
+[<Fact>]
+let ``Expression: double function call`` () =
     let funCall = Cst.FunCall {| func = Cst.Reference "f"; arguments = []; |}
-    let expected = Cst.Expression <| Cst.FunCall {| func = funCall; arguments = []; |}
-    let actual = CstParser.ParseModule.funBodyItem [
+    let expected = Cst.FunCall {| func = funCall; arguments = []; |}
+    let actual = CstParser.ParseExpression.tryExpression [
         Lexeme.Identifier "f"
         Lexeme.LeftBracket
         Lexeme.RightBracket
         Lexeme.LeftBracket
-        Lexeme.RightBracket
-        Lexeme.Semicolon ]
+        Lexeme.RightBracket ]
     test <@ ParserHelper.Match ([], expected) = actual @>
 
 [<Fact>]
-let ``Function body: nested function call`` () =
+let ``Expression: nested function call`` () =
     let funCallG = Cst.FunCall {| func = Cst.Reference "g"; arguments = []; |}
     let funCallH = Cst.FunCall {| func = Cst.Reference "h"; arguments = []; |}
-    let expected = Cst.Expression <| Cst.FunCall {| func = Cst.Reference "f"; arguments = [funCallG; funCallH]; |}
-    let actual = CstParser.ParseModule.funBodyItem [
+    let expected = Cst.FunCall {| func = Cst.Reference "f"; arguments = [funCallG; funCallH]; |}
+    let actual = CstParser.ParseExpression.tryExpression [
         Lexeme.Identifier "f"
         Lexeme.LeftBracket
         Lexeme.Identifier "g"
@@ -334,6 +348,5 @@ let ``Function body: nested function call`` () =
         Lexeme.Identifier "h"
         Lexeme.LeftBracket
         Lexeme.RightBracket
-        Lexeme.RightBracket
-        Lexeme.Semicolon ]
+        Lexeme.RightBracket ]
     test <@ ParserHelper.Match ([], expected) = actual @>
