@@ -345,6 +345,13 @@ let ``Expression: integer constant`` () =
     test <@ ParserHelper.Match ([], expected) = actual @>
 
 [<Fact>]
+let ``Expression: string constant`` () =
+    let expected = Cst.StringVal "hello"
+    let actual = CstParser.ParseExpression.tryExpression [
+        Lexeme.StringLiteral "hello" ]
+    test <@ ParserHelper.Match ([], expected) = actual @>
+
+[<Fact>]
 let ``Expression: negative integer constant`` () =
     let expected = Cst.Negate <| Cst.IntVal 10L
     let actual = CstParser.ParseExpression.tryExpression [

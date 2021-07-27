@@ -7,6 +7,7 @@ module Cst =
         | IntVal of int64
         | CharVal of char
         | BoolVal of bool
+        | StringVal of string
         | Reference of string
         | Null
         | FunCall of {| func: Expr; arguments: Expr list; |}
@@ -295,6 +296,8 @@ module CstParser =
 
         let intConst = parseSeq { let! intVal = tryMatchInt in return Cst.IntVal intVal }
 
+        let stringConst = parseSeq { let! value = tryMatchString in return Cst.StringVal value }
+
         let reference = parseSeq { let! identifier = tryMatchIdentifier in return Cst.Reference identifier }
 
         let brackets innerParser = parseSeq {
@@ -311,6 +314,7 @@ module CstParser =
 
         let minimalExpression innerParser = tryParsers [
             intConst
+            stringConst
             reference
             negate innerParser
             brackets innerParser ]
