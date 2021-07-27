@@ -10,7 +10,6 @@ module Cst =
         | Reference of string
         | Null
         | FunCall of {| func: Expr; arguments: Expr list; |}
-        | SizeOf of Expr
         | AddressOf of Expr
 
     type TupleType = TupleType of {| name: string option; type_: Type |} list
@@ -284,6 +283,42 @@ module CstParser =
             return { Cst.arguments = toTupleType arguments
                      Cst.result = toTupleType result } }
 
+    module ParseExpression =
+
+        let intConst = parseSeq { let! intVal = tryMatchInt in return Cst.IntVal intVal }
+
+        let reference = parseSeq { let! identifier = tryMatchIdentifier in return Cst.Reference identifier }
+
+        let brackets innerParser = parseSeq {
+            do! tryMatchEq Lexeme.LeftBracket
+            let! result = innerParser "expression inside brackets"
+            do! matchEq Lexeme.RightBracket "matching closing bracket in expression"
+            return result }
+
+        let minimalExpression innerParser = tryParsers [
+            intConst
+            reference
+            brackets innerParser ]
+
+        let continueFunCall func = parseSeq {
+            do! tryMatchEq Lexeme.LeftBracket
+            do! matchEq Lexeme.RightBracket "right bracket after arguments list in function call"
+            let result = Cst.FunCall {| func = func; arguments = []; |}
+            return result }
+
+        let rec tryContinueExpression result = tryParsers [
+            parseSeq {
+                let! funCallResult = continueFunCall result
+                return! tryContinueExpression funCallResult }
+            parseSeq { return result } ]
+
+        let expressionRec innerParser = parseSeq {
+            let! minimal = minimalExpression innerParser
+            return! tryContinueExpression minimal }
+
+        let rec tryExpression lexemes = expressionRec expression lexemes
+        and expression expected = failIfNoMatch tryExpression expected
+
     module ParseModule = 
 
         let constDefinition = parseSeq {
@@ -292,13 +327,13 @@ module CstParser =
             do! matchEq (Lexeme.Operator ":") "colon after constant name in constant definition"
             let! constType = failIfNoMatch ParseType.tryType "constant type after colon in constant definition"
             do! matchEq (Lexeme.Operator ":=") "assignment operator after constant type in constant definition"
-            let! intValue = matchInt "constant value after assignment operator in constant definition"
+            let! value = ParseExpression.expression "constant value after assignment operator in constant definition"
             do! matchEq Lexeme.Semicolon "semicolon after constant definition"
 
             let constantDefinition =
                 { Cst.ConstDefinition.name = name
                   Cst.ConstDefinition.type_ = constType
-                  Cst.ConstDefinition.value = Cst.IntVal intValue }
+                  Cst.ConstDefinition.value = value }
             return constantDefinition }
 
         let varDefinition = parseSeq {
@@ -317,30 +352,23 @@ module CstParser =
         let assignment = parseSeq {
             let! name = tryMatchIdentifier
             do! tryMatchEq (Lexeme.Operator ":=")
-            let! intValue = matchInt "assignement value after assignment operator"
-            do! matchEq Lexeme.Semicolon "semicolon after assignment definition"
+            let! value = ParseExpression.expression "expression after assignment operator"
+            do! matchEq Lexeme.Semicolon "semicolon after assignment"
 
             let assignment =
                 { Cst.Assignment.name = name
-                  Cst.Assignment.value = Cst.IntVal intValue }
+                  Cst.Assignment.value = value }
             return Cst.Assignment assignment }
 
-        let funCall = parseSeq {
-            let! name = tryMatchIdentifier
-            do! tryMatchEq Lexeme.LeftBracket
-            do! matchEq Lexeme.RightBracket "right bracket after arguments list in function call"
-            do! matchEq Lexeme.Semicolon "semicolon after function call"
-
-            let expr =
-                Cst.FunCall
-                    {| func = Cst.Reference name
-                       arguments = [] |}
-            return expr }
+        let expr = parseSeq {
+            let! result = ParseExpression.tryExpression
+            do! matchEq Lexeme.Semicolon "semicolon after expression"
+            return Cst.Expression result }
 
         let funBodyItem = tryParsers [
             parseSeq { let! varDef = varDefinition in return Cst.VarStatement varDef }
             assignment
-            parseSeq { let! expr = funCall in return Cst.Expression expr } ]
+            expr ]
 
         let funDefinition = parseSeq {
             do! tryMatchEq (Lexeme.Identifier "fun")
