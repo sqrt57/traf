@@ -223,6 +223,37 @@ let ``Module: function definition with complex types`` () =
     test <@ ParserHelper.Match ([], expected) = actual @>
 
 [<Fact>]
+let ``Module: function definition with named parameters`` () =
+    let expected =
+        Cst.FunDefinition
+            {| name = "F"
+               type_ = { arguments = Cst.TupleType [ {| name = Some "x"; type_ = Cst.TypeName "int8" |}
+                                                     {| name = Some "y"; type_ = Cst.TypeName "int16" |} ]
+                         result = Cst.TupleType [] }
+               body = Cst.FunBody []
+               attributes = Cst.AttrLists [] |}
+
+    let actual = CstParser.ParseModule.moduleBodyItem [
+        Lexeme.Identifier "fun"
+        Lexeme.Identifier "F"
+        Lexeme.Operator ":"
+        Lexeme.LeftBracket
+        Lexeme.Identifier "x"
+        Lexeme.Operator ":"
+        Lexeme.Identifier "int8"
+        Lexeme.Comma
+        Lexeme.Identifier "y"
+        Lexeme.Operator ":"
+        Lexeme.Identifier "int16"
+        Lexeme.RightBracket
+        Lexeme.Operator "->"
+        Lexeme.LeftBracket
+        Lexeme.RightBracket
+        Lexeme.LeftCurly
+        Lexeme.RightCurly ]
+    test <@ ParserHelper.Match ([], expected) = actual @>
+
+[<Fact>]
 let ``Module: external function definition`` () =
     let expected =
         Cst.ExternFunDefinition

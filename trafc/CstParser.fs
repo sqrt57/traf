@@ -205,6 +205,16 @@ module CstParser =
         CstParserError {| expected = expected; got = got; |}
 
     module ParseType =
+        let private typeTupleItem typeParser = tryParsers [
+            parseSeq {
+                let! name = tryMatchIdentifier
+                do! tryMatchEq (Lexeme.Operator ":")
+                let! type_ = typeParser
+                return {| name = Some name; type_ = type_; |} }
+            parseSeq {
+                let! type_ = typeParser
+                return {| name = None; type_ = type_; |} } ]
+
         let rec private typeName = parseSeq {
             let! typeName = tryMatchIdentifier
             return Cst.TypeName typeName }
@@ -235,18 +245,14 @@ module CstParser =
                     return elements |> List.rev |> Cst.TupleType |> Cst.Type.Tuple }
             ]
 
-        and private typeTupleItem lexeme = (parseSeq {
-            let! type_ = anyType
-            return {| name = None; type_ = type_; |} } ) lexeme
-
         and private typeBrackets lexeme = (parseSeq {
             do! tryMatchEq Lexeme.LeftBracket
             let! typeItems = tryParsers [
                 parseSeq {
-                    let! first = typeTupleItem
+                    let! first = typeTupleItem anyType
                     let! rest = zeroOrMore (parseSeq {
                         do! tryMatchEq Lexeme.Comma
-                        return! typeTupleItem } )
+                        return! typeTupleItem anyType } )
                     do! tryParsers [
                         tryMatchEq Lexeme.Comma
                         parseSeq { return () } ]
