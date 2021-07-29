@@ -73,7 +73,7 @@ let ``Module: const definition with sized array type`` () =
     let expected =
         Cst.ConstDefinition
             { name = "C"
-              type_ = Cst.Array {| type_ = Cst.TypeRef "int32"; size = Some <| Cst.IntVal 20L; |}
+              type_ = Cst.Array { type_ = Cst.TypeRef "int32"; size = Some <| Cst.IntVal 20L; }
               value = Cst.IntVal 15L }
     let actual = CstParser.ParseModule.moduleBodyItem [
         Lexeme.Identifier "const"
@@ -93,7 +93,7 @@ let ``Module: const definition with unsized array type`` () =
     let expected =
         Cst.ConstDefinition
             { name = "C"
-              type_ = Cst.Array {| type_ = Cst.TypeRef "int32"; size = None; |}
+              type_ = Cst.Array { type_ = Cst.TypeRef "int32"; size = None; }
               value = Cst.IntVal 15L }
     let actual = CstParser.ParseModule.moduleBodyItem [
         Lexeme.Identifier "const"
@@ -329,7 +329,7 @@ let ``Function body: assignment`` () =
 
 [<Fact>]
 let ``Function body: function call`` () =
-    let expected = Cst.Expression <| Cst.FunCall {| func = Cst.Reference "f"; arguments = []; |}
+    let expected = Cst.Expression <| Cst.FunCall { func = Cst.Ref "f"; arguments = []; }
     let actual = CstParser.ParseModule.funBodyItem [
         Lexeme.Identifier "f"
         Lexeme.LeftBracket
@@ -361,7 +361,7 @@ let ``Expression: string constant`` () =
 
 [<Fact>]
 let ``Expression: address of variable`` () =
-    let expected = Cst.AddressOf <| Cst.Reference "x"
+    let expected = Cst.AddressOf <| Cst.Ref "x"
     let actual = CstParser.ParseExpression.tryExpression [
         Lexeme.AtSign
         Lexeme.Identifier "x" ]
@@ -369,8 +369,8 @@ let ``Expression: address of variable`` () =
 
 [<Fact>]
 let ``Expression: double function call`` () =
-    let funCall = Cst.FunCall {| func = Cst.Reference "f"; arguments = []; |}
-    let expected = Cst.FunCall {| func = funCall; arguments = []; |}
+    let funCall = Cst.FunCall { func = Cst.Ref "f"; arguments = []; }
+    let expected = Cst.FunCall { func = funCall; arguments = []; }
     let actual = CstParser.ParseExpression.tryExpression [
         Lexeme.Identifier "f"
         Lexeme.LeftBracket
@@ -381,9 +381,9 @@ let ``Expression: double function call`` () =
 
 [<Fact>]
 let ``Expression: nested function call`` () =
-    let funCallG = Cst.FunCall {| func = Cst.Reference "g"; arguments = []; |}
-    let funCallH = Cst.FunCall {| func = Cst.Reference "h"; arguments = []; |}
-    let expected = Cst.FunCall {| func = Cst.Reference "f"; arguments = [funCallG; funCallH]; |}
+    let funCallG = Cst.FunCall { func = Cst.Ref "g"; arguments = []; }
+    let funCallH = Cst.FunCall { func = Cst.Ref "h"; arguments = []; }
+    let expected = Cst.FunCall { func = Cst.Ref "f"; arguments = [funCallG; funCallH]; }
     let actual = CstParser.ParseExpression.tryExpression [
         Lexeme.Identifier "f"
         Lexeme.LeftBracket

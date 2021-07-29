@@ -8,22 +8,25 @@ module Cst =
         | CharVal of char
         | BoolVal of bool
         | StringVal of string
-        | Reference of string
+        | Ref of string
         | Null
-        | FunCall of {| func: Expr; arguments: Expr list; |}
         | AddressOf of Expr
         | Negate of Expr
-        | Operator of {| left: Expr; op: string; right: Expr; |}
+        | FunCall of FunCall
+        | Operator of OperatorCall
+    and FunCall = { func: Expr; arguments: Expr list; }
+    and OperatorCall = { left: Expr; op: string; right: Expr; }
 
-    type TypeTupleSlot = { name: string option; type_: Type }
-    and TypeTuple = TypeTuple of TypeTupleSlot list
-    and FunType = { arguments: TypeTuple; result: TypeTuple }
-    and Type =
+    type Type =
         | TypeRef of string
-        | Array of {| type_: Type; size: Expr option |}
+        | Array of ArrayType
         | Pointer of Type
         | Fun of FunType
         | Tuple of TypeTuple
+    and TypeTupleSlot = { name: string option; type_: Type }
+    and TypeTuple = TypeTuple of TypeTupleSlot list
+    and FunType = { arguments: TypeTuple; result: TypeTuple }
+    and ArrayType = { type_: Type; size: Expr option }
 
     type AttrValue =
         | None
@@ -247,7 +250,7 @@ module CstParser =
                 return Some <| Cst.IntVal intValue } )
             do! matchEq Lexeme.RightSquare "closing square bracket in array type"
             let! arrayType = failIfNoMatch anyType "array element type"
-            return Cst.Array {| type_ = arrayType; size = size; |} } ) lexemes
+            return Cst.Array { type_ = arrayType; size = size } } ) lexemes
 
         and private typeCloseBrackets elements =
             tryParsers [
@@ -304,8 +307,8 @@ module CstParser =
             let! arguments = failIfNoMatch nonFunType "type in function arguments type"
             do! matchEq (Lexeme.Operator "->") "-> in function type"
             let! result = failIfNoMatch nonFunType "type in function result type"
-            return { Cst.arguments = toTupleType arguments
-                     Cst.result = toTupleType result } }
+            return ( { arguments = toTupleType arguments
+                       result = toTupleType result } : Cst.FunType) }
 
     module ParseExpression =
 
@@ -313,7 +316,7 @@ module CstParser =
 
         let stringConst = parseSeq { let! value = tryMatchString in return Cst.StringVal value }
 
-        let reference = parseSeq { let! identifier = tryMatchIdentifier in return Cst.Reference identifier }
+        let reference = parseSeq { let! identifier = tryMatchIdentifier in return Cst.Ref identifier }
 
         let brackets innerParser = parseSeq {
             do! tryMatchEq Lexeme.LeftBracket
@@ -354,7 +357,7 @@ module CstParser =
             do! tryMatchEq Lexeme.LeftBracket
             let! args = funArgs innerParser
             do! matchEq Lexeme.RightBracket "right bracket after arguments list in function call"
-            let result = Cst.FunCall {| func = func; arguments = args; |}
+            let result = Cst.FunCall { func = func; arguments = args; }
             return result }
 
         let rec tryContinueExpression innerParser result = tryParsers [
@@ -433,7 +436,7 @@ module CstParser =
 
             let functionDefinition : Cst.FunDefinition =
                 { name = name
-                  type_ = { Cst.arguments = funType.arguments; Cst.result = funType.result }
+                  type_ = { arguments = funType.arguments; result = funType.result }
                   body = Cst.FunBody bodyItems
                   attributes = Cst.AttrLists [] }
             return functionDefinition }
@@ -448,7 +451,7 @@ module CstParser =
 
             let externDefinition : Cst.ExternFunDefinition =
                 { name = name
-                  type_ = { Cst.arguments = funType.arguments; Cst.result = funType.result }
+                  type_ = { arguments = funType.arguments; result = funType.result }
                   attributes = Cst.AttrLists [] }
             return externDefinition }
 

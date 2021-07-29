@@ -80,5 +80,8 @@ let main argv =
             eprintfn "Error while lexing: %s" err.message
             1
         | CstParser.CstParserError err ->
-            eprintfn "Error while parsing to CST: Expected %s but got %O" err.expected err.got
+            eprintfn "Error while parsing to CST: Expected %s but got %A" err.expected err.got
+            1
+        | AstConvert.AstConvertError err ->
+            eprintfn "Error while converting CST to AST: %s" err.message
             1
