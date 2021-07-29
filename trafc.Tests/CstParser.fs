@@ -1,4 +1,4 @@
-module Triton.Tests.ParserTests
+module Triton.Tests.CstParserTests
 
 open Xunit
 open Swensen.Unquote
@@ -11,7 +11,7 @@ let ``Top level: empty source`` () =
 
 [<Fact>]
 let ``Top level: empty module`` () =
-    let expected = Cst.TopLevel [ { name = "X"; definitions = [] } ]
+    let expected = Cst.TopLevel [ { name = "X"; definitions = Cst.ModuleTopLevel [] } ]
     let actual = CstParser.parse [ Lexeme.Identifier "module"
                                    Lexeme.Identifier "X"
                                    Lexeme.LeftCurly
@@ -20,8 +20,8 @@ let ``Top level: empty module`` () =
 
 [<Fact>]
 let ``Top level: two empty modules`` () =
-    let expected = Cst.TopLevel [ { name = "X"; definitions = [] }
-                                  { name = "Y"; definitions = [] } ]
+    let expected = Cst.TopLevel [ { name = "X"; definitions = Cst.ModuleTopLevel [] }
+                                  { name = "Y"; definitions = Cst.ModuleTopLevel [] } ]
     let actual = CstParser.parse [ Lexeme.Identifier "module"
                                    Lexeme.Identifier "X"
                                    Lexeme.LeftCurly
@@ -39,7 +39,7 @@ let ``Module: do not parse closing bracket`` () =
 
 [<Fact>]
 let ``Module: const definition with simple type`` () =
-    let expected = Cst.ConstDefinition { name = "C"; type_ = Cst.TypeName "int32"; value = Cst.IntVal 15L }
+    let expected = Cst.ConstDefinition { name = "C"; type_ = Cst.TypeRef "int32"; value = Cst.IntVal 15L }
     let actual = CstParser.ParseModule.moduleBodyItem [
         Lexeme.Identifier "const"
         Lexeme.Identifier "C"
@@ -55,7 +55,7 @@ let ``Module: const definition with pointer type`` () =
     let expected =
         Cst.ConstDefinition
             { name = "C"
-              type_ = Cst.Pointer <| Cst.TypeName "int32"
+              type_ = Cst.Pointer <| Cst.TypeRef "int32"
               value = Cst.IntVal 15L }
     let actual = CstParser.ParseModule.moduleBodyItem [
         Lexeme.Identifier "const"
@@ -73,7 +73,7 @@ let ``Module: const definition with sized array type`` () =
     let expected =
         Cst.ConstDefinition
             { name = "C"
-              type_ = Cst.Array {| type_ = Cst.TypeName "int32"; size = Some <| Cst.IntVal 20L; |}
+              type_ = Cst.Array {| type_ = Cst.TypeRef "int32"; size = Some <| Cst.IntVal 20L; |}
               value = Cst.IntVal 15L }
     let actual = CstParser.ParseModule.moduleBodyItem [
         Lexeme.Identifier "const"
@@ -93,7 +93,7 @@ let ``Module: const definition with unsized array type`` () =
     let expected =
         Cst.ConstDefinition
             { name = "C"
-              type_ = Cst.Array {| type_ = Cst.TypeName "int32"; size = None; |}
+              type_ = Cst.Array {| type_ = Cst.TypeRef "int32"; size = None; |}
               value = Cst.IntVal 15L }
     let actual = CstParser.ParseModule.moduleBodyItem [
         Lexeme.Identifier "const"
@@ -112,7 +112,7 @@ let ``Module: const definition simple type with brackets`` () =
     let expected =
         Cst.ConstDefinition
             { name = "C"
-              type_ = Cst.Type.Tuple <| Cst.TupleType [ {| name = None; type_ = Cst.TypeName "int32" |} ]
+              type_ = Cst.Type.Tuple <| Cst.TypeTuple [ { name = None; type_ = Cst.TypeRef "int32" } ]
               value = Cst.IntVal 15L }
     let actual = CstParser.ParseModule.moduleBodyItem [
         Lexeme.Identifier "const"
@@ -130,10 +130,10 @@ let ``Module: const definition simple type with brackets`` () =
 let ``Module: function definition`` () =
     let expected =
         Cst.FunDefinition
-            {| name = "F"
-               type_ = { arguments = Cst.TupleType []; result = Cst.TupleType [] }
-               body = Cst.FunBody []
-               attributes = Cst.AttrLists [] |}
+            { name = "F"
+              type_ = { arguments = Cst.TypeTuple []; result = Cst.TypeTuple [] }
+              body = Cst.FunBody []
+              attributes = Cst.AttrLists [] }
     let actual = CstParser.ParseModule.moduleBodyItem [
         Lexeme.Identifier "fun"
         Lexeme.Identifier "F"
@@ -151,11 +151,11 @@ let ``Module: function definition`` () =
 let ``Module: function definition with simple types`` () =
     let expected =
         Cst.FunDefinition
-            {| name = "F"
-               type_ = { arguments = Cst.TupleType [ {| name = None; type_ = Cst.TypeName "int16" |} ]
-                         result = Cst.TupleType [ {| name = None; type_ = Cst.TypeName "int32" |} ] }
-               body = Cst.FunBody []
-               attributes = Cst.AttrLists [] |}
+            { name = "F"
+              type_ = { arguments = Cst.TypeTuple [ { name = None; type_ = Cst.TypeRef "int16" } ]
+                        result = Cst.TypeTuple [ { name = None; type_ = Cst.TypeRef "int32" } ] }
+              body = Cst.FunBody []
+              attributes = Cst.AttrLists [] }
     let actual = CstParser.ParseModule.moduleBodyItem [
         Lexeme.Identifier "fun"
         Lexeme.Identifier "F"
@@ -171,11 +171,11 @@ let ``Module: function definition with simple types`` () =
 let ``Module: function definition with simple types in brackets`` () =
     let expected =
         Cst.FunDefinition
-            {| name = "F"
-               type_ = { arguments = Cst.TupleType [ {| name = None; type_ = Cst.TypeName "int16" |} ]
-                         result = Cst.TupleType [ {| name = None; type_ = Cst.TypeName "int32" |} ] }
-               body = Cst.FunBody []
-               attributes = Cst.AttrLists [] |}
+            { name = "F"
+              type_ = { arguments = Cst.TypeTuple [ { name = None; type_ = Cst.TypeRef "int16" } ]
+                        result = Cst.TypeTuple [ { name = None; type_ = Cst.TypeRef "int32" } ] }
+              body = Cst.FunBody []
+              attributes = Cst.AttrLists [] }
     let actual = CstParser.ParseModule.moduleBodyItem [
         Lexeme.Identifier "fun"
         Lexeme.Identifier "F"
@@ -195,13 +195,13 @@ let ``Module: function definition with simple types in brackets`` () =
 let ``Module: function definition with complex types`` () =
     let expected =
         Cst.FunDefinition
-            {| name = "F"
-               type_ = { arguments = Cst.TupleType [ {| name = None; type_ = Cst.TypeName "int8" |}
-                                                     {| name = None; type_ = Cst.TypeName "int16" |} ]
-                         result = Cst.TupleType [ {| name = None; type_ = Cst.TypeName "int32" |} 
-                                                  {| name = None; type_ = Cst.TypeName "int64" |} ] }
-               body = Cst.FunBody []
-               attributes = Cst.AttrLists [] |}
+            { name = "F"
+              type_ = { arguments = Cst.TypeTuple [ { name = None; type_ = Cst.TypeRef "int8" }
+                                                    { name = None; type_ = Cst.TypeRef "int16" } ]
+                        result = Cst.TypeTuple [ { name = None; type_ = Cst.TypeRef "int32" } 
+                                                 { name = None; type_ = Cst.TypeRef "int64" } ] }
+              body = Cst.FunBody []
+              attributes = Cst.AttrLists [] }
 
     let actual = CstParser.ParseModule.moduleBodyItem [
         Lexeme.Identifier "fun"
@@ -226,12 +226,12 @@ let ``Module: function definition with complex types`` () =
 let ``Module: function definition with named parameters`` () =
     let expected =
         Cst.FunDefinition
-            {| name = "F"
-               type_ = { arguments = Cst.TupleType [ {| name = Some "x"; type_ = Cst.TypeName "int8" |}
-                                                     {| name = Some "y"; type_ = Cst.TypeName "int16" |} ]
-                         result = Cst.TupleType [] }
-               body = Cst.FunBody []
-               attributes = Cst.AttrLists [] |}
+            { name = "F"
+              type_ = { arguments = Cst.TypeTuple [ { name = Some "x"; type_ = Cst.TypeRef "int8" }
+                                                    { name = Some "y"; type_ = Cst.TypeRef "int16" } ]
+                        result = Cst.TypeTuple [] }
+              body = Cst.FunBody []
+              attributes = Cst.AttrLists [] }
 
     let actual = CstParser.ParseModule.moduleBodyItem [
         Lexeme.Identifier "fun"
@@ -257,13 +257,13 @@ let ``Module: function definition with named parameters`` () =
 let ``Module: external function definition`` () =
     let expected =
         Cst.ExternFunDefinition
-            {| name = "exit_process"
-               type_ = { arguments = Cst.TupleType [ {| name = None; type_ = Cst.TypeName "uint32"; |} ]
-                         result = Cst.TupleType [] }
-               attributes = Cst.AttrLists [
-                   Cst.AttrList [ { name = "dll_import"; value = Cst.String "kernel32.dll" }
-                                  { name = "entry_point"; value = Cst.Int 5L } ]
-                   Cst.AttrList [ { name = "std_call"; value = Cst.None } ] ] |}
+            { name = "exit_process"
+              type_ = { arguments = Cst.TypeTuple [ { name = None; type_ = Cst.TypeRef "uint32"; } ]
+                        result = Cst.TypeTuple [] }
+              attributes = Cst.AttrLists [
+                  Cst.AttrList [ { name = "dll_import"; value = Cst.String "kernel32.dll" }
+                                 { name = "entry_point"; value = Cst.Int 5L } ]
+                  Cst.AttrList [ { name = "std_call"; value = Cst.None } ] ] }
     let actual = CstParser.ParseModule.moduleBodyItem [
         Lexeme.LeftSquare
         Lexeme.Identifier "dll_import"
@@ -308,7 +308,7 @@ let ``Function body: do not parse closing bracket`` () =
 
 [<Fact>]
 let ``Function body: variable definition`` () =
-    let expected = Cst.VarStatement { name = "x"; type_ = Cst.TypeName "int32"; value = None; }
+    let expected = Cst.VarStatement { name = "x"; type_ = Cst.TypeRef "int32"; value = None; }
     let actual = CstParser.ParseModule.funBodyItem [
         Lexeme.Identifier "var"
         Lexeme.Identifier "x"

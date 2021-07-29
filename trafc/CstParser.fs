@@ -15,14 +15,15 @@ module Cst =
         | Negate of Expr
         | Operator of {| left: Expr; op: string; right: Expr; |}
 
-    type TupleType = TupleType of {| name: string option; type_: Type |} list
-    and FunType = { arguments: TupleType; result: TupleType }
+    type TypeTupleSlot = { name: string option; type_: Type }
+    and TypeTuple = TypeTuple of TypeTupleSlot list
+    and FunType = { arguments: TypeTuple; result: TypeTuple }
     and Type =
-        | TypeName of string
+        | TypeRef of string
         | Array of {| type_: Type; size: Expr option |}
         | Pointer of Type
         | Fun of FunType
-        | Tuple of TupleType
+        | Tuple of TypeTuple
 
     type AttrValue =
         | None
@@ -33,23 +34,37 @@ module Cst =
     type AttrLists = AttrLists of AttrList list
 
     type ConstDefinition = { name: string; type_: Type; value: Expr; }
-    type VariableDefinition = { name: string; type_: Type; value: Expr option; }
+    type VarDefinition = { name: string; type_: Type; value: Expr option; }
 
     type Assignment = { name: string; value: Expr; }
 
     type Statement =
         | ConstStatement of ConstDefinition
-        | VarStatement of VariableDefinition
+        | VarStatement of VarDefinition
         | Assignment of Assignment
         | Expression of Expr
     type FunBody = FunBody of Statement list
 
-    type ModuleTopLevel =
-        | ConstDefinition of ConstDefinition
-        | FunDefinition of {| name: string; type_: FunType; body: FunBody; attributes: AttrLists |}
-        | ExternFunDefinition of {| name: string; type_: FunType; attributes: AttrLists |}
+    type FunDefinition =
+        { name: string
+          type_: FunType
+          body: FunBody
+          attributes: AttrLists }
 
-    type Module = { name: string; definitions: ModuleTopLevel list }
+    type ExternFunDefinition =
+        { name: string
+          type_: FunType
+          attributes: AttrLists }
+
+    type ModuleItem =
+        | ConstDefinition of ConstDefinition
+        | VarDefinition of VarDefinition
+        | FunDefinition of FunDefinition
+        | ExternFunDefinition of ExternFunDefinition
+
+    type ModuleTopLevel = ModuleTopLevel of ModuleItem list
+
+    type Module = { name: string; definitions: ModuleTopLevel }
 
     type TopLevel = TopLevel of Module list
 
@@ -211,14 +226,14 @@ module CstParser =
                 let! name = tryMatchIdentifier
                 do! tryMatchEq (Lexeme.Operator ":")
                 let! type_ = typeParser
-                return {| name = Some name; type_ = type_; |} }
+                return ({ name = Some name; type_ = type_; } : Cst.TypeTupleSlot) }
             parseSeq {
                 let! type_ = typeParser
-                return {| name = None; type_ = type_; |} } ]
+                return ({ name = None; type_ = type_; } : Cst.TypeTupleSlot) } ]
 
         let rec private typeName = parseSeq {
             let! typeName = tryMatchIdentifier
-            return Cst.TypeName typeName }
+            return Cst.TypeRef typeName }
 
         and private pointerType lexemes = (parseSeq {
             do! tryMatchEq Lexeme.Caret
@@ -239,11 +254,11 @@ module CstParser =
                 parseSeq {
                     do! tryMatchEq Lexeme.Comma
                     let! nextType = failIfNoMatch anyType "type in tuple type"
-                    let newElements = {| name = None; type_ = nextType; |} :: elements
+                    let newElements : Cst.TypeTupleSlot list = { name = None; type_ = nextType; } :: elements
                     return! typeCloseBrackets newElements }
                 parseSeq {
                     do! matchEq Lexeme.RightBracket "closing bracket in tuple type"
-                    return elements |> List.rev |> Cst.TupleType |> Cst.Type.Tuple }
+                    return elements |> List.rev |> Cst.TypeTuple |> Cst.Type.Tuple }
             ]
 
         and private typeBrackets lexeme = (parseSeq {
@@ -260,7 +275,7 @@ module CstParser =
                     return first :: rest }
                 parseSeq { return [] }] 
             do! matchEq Lexeme.RightBracket "next type or right bracket in type tuple"
-            return typeItems |> Cst.TupleType |> Cst.Type.Tuple } ) lexeme
+            return typeItems |> Cst.TypeTuple |> Cst.Type.Tuple } ) lexeme
 
         and private nonFunType = tryParsers [
             typeName
@@ -270,7 +285,7 @@ module CstParser =
 
         and private toTupleType = function
             | Cst.Type.Tuple tt -> tt
-            | t -> Cst.TupleType [ {| name = None; type_ = t|} ]
+            | t -> Cst.TypeTuple [ { name = None; type_ = t; } ]
 
         and private anyType lexemes = (parseSeq {
             let! arguments = nonFunType
@@ -380,10 +395,10 @@ module CstParser =
             let! varType = failIfNoMatch ParseType.tryType "variable type after colon in variable definition"
             do! matchEq Lexeme.Semicolon "semicolon after variable definition"
 
-            let variableDefinition =
-                { Cst.VariableDefinition.name = name
-                  Cst.VariableDefinition.type_ = varType
-                  Cst.VariableDefinition.value = None }
+            let variableDefinition : Cst.VarDefinition =
+                { name = name
+                  type_ = varType
+                  value = None }
             return variableDefinition }
 
         let assignment = parseSeq {
@@ -416,11 +431,11 @@ module CstParser =
             let! bodyItems = zeroOrMore funBodyItem
             do! matchEq Lexeme.RightCurly "closing curly bracket after function body in function definition"
 
-            let functionDefinition =
-                {| name = name
-                   type_ = { Cst.arguments = funType.arguments; Cst.result = funType.result }
-                   body = Cst.FunBody bodyItems
-                   attributes = Cst.AttrLists [] |}
+            let functionDefinition : Cst.FunDefinition =
+                { name = name
+                  type_ = { Cst.arguments = funType.arguments; Cst.result = funType.result }
+                  body = Cst.FunBody bodyItems
+                  attributes = Cst.AttrLists [] }
             return functionDefinition }
 
         let externFunDefinition = parseSeq {
@@ -431,10 +446,10 @@ module CstParser =
             let! funType = ParseType.funType
             do! matchEq Lexeme.Semicolon "semicolon after external function definition"
 
-            let externDefinition =
-                {| name = name
-                   type_ = { Cst.arguments = funType.arguments; Cst.result = funType.result }
-                   attributes = Cst.AttrLists [] |}
+            let externDefinition : Cst.ExternFunDefinition =
+                { name = name
+                  type_ = { Cst.arguments = funType.arguments; Cst.result = funType.result }
+                  attributes = Cst.AttrLists [] }
             return externDefinition }
 
         let funAttr = parseSeq {
@@ -446,7 +461,7 @@ module CstParser =
                     parseSeq { let! value = tryMatchString in return Cst.String value }
                 ] ) "attribute value"
             } )
-            return { Cst.name = name; Cst.value = value; } }
+            return ({ name = name; value = value; } : Cst.AttrDefinition) }
 
         let funAttrList = parseSeq {
             do! tryMatchEq Lexeme.LeftSquare
@@ -458,8 +473,8 @@ module CstParser =
             return Cst.AttrList (first :: rest) }
 
         let withAttrLists attributes = tryParsers [
-            parseSeq { let! funDef = funDefinition in return Cst.FunDefinition {| funDef with attributes = attributes |} }
-            parseSeq { let! externDef = externFunDefinition in return Cst.ExternFunDefinition {| externDef with attributes = attributes |} }
+            parseSeq { let! funDef = funDefinition in return Cst.FunDefinition { funDef with attributes = attributes } }
+            parseSeq { let! externDef = externFunDefinition in return Cst.ExternFunDefinition { externDef with attributes = attributes } }
             parseSeq { return! fail "function definition after attributes" }
         ]
 
@@ -476,7 +491,7 @@ module CstParser =
             do! matchEq Lexeme.LeftCurly "module body"
             let! items = zeroOrMore moduleBodyItem
             do! matchEq Lexeme.RightCurly "module definition or closing curly bracket"
-            return { Cst.Module.name = name; Cst.Module.definitions = items } }
+            return { Cst.Module.name = name; Cst.Module.definitions = Cst.ModuleTopLevel items } }
 
         let topLevel = parseSeq {
             let! modules = zeroOrMore moduleDefinition

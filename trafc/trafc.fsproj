@@ -8,7 +8,7 @@
   <ItemGroup>
     <Compile Include="lexer.fs" />
     <Compile Include="CstParser.fs" />
-    <Compile Include="Parser.fs" />
+    <Compile Include="AstConvert.fs" />
     <Compile Include="driver.fs" />
     <Compile Include="trafc.fs" />
   </ItemGroup>
