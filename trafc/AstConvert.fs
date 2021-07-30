@@ -69,8 +69,8 @@ module Ast =
 
     type ExternFunAttrs =
         { dll_import: string option
-          entry_point: string option
-          entry_point_num: int64 option }
+          dll_entry_point_name: string option
+          dll_entry_point_ordinal: int64 option }
 
     type ExternFunDefinition =
         { name: string
@@ -188,16 +188,15 @@ module AstConvert =
             | None -> { attrs with dll_import = Some s }
             | _ -> raise (AstConvertError {| message = "duplicate dll_import extern function attribute" |})
         | "dll_import", _ -> raise (AstConvertError {| message = "dll_import extern function attribute should have string value" |})
-        | "entry_point", Cst.String s ->
-            match attrs.entry_point with
-            | None -> { attrs with entry_point = Some s }
-            | _ -> raise (AstConvertError {| message = "duplicate entry_point extern function attribute" |})
-        | "entry_point", _ -> raise (AstConvertError {| message = "entry_point extern function attribute should have string value" |})
-        | "entry_point_num", Cst.Int i ->
-            match attrs.entry_point with
-            | None -> { attrs with entry_point_num = Some i }
-            | _ -> raise (AstConvertError {| message = "duplicate entry_point_num extern function attribute" |})
-        | "entry_point_num", _ -> raise (AstConvertError {| message = "entry_point_num extern function attribute should have integer value" |})
+        | "dll_entry_point", Cst.String s ->
+            match attrs.dll_entry_point_name, attrs.dll_entry_point_ordinal with
+            | None, None -> { attrs with dll_entry_point_name = Some s }
+            | _ -> raise (AstConvertError {| message = "duplicate dll_entry_point extern function attribute" |})
+        | "dll_entry_point", Cst.Int i ->
+            match attrs.dll_entry_point_name, attrs.dll_entry_point_ordinal with
+            | None, None -> { attrs with dll_entry_point_ordinal = Some i }
+            | _ -> raise (AstConvertError {| message = "duplicate dll_entry_point extern function attribute" |})
+        | "dll_entry_point", _ -> raise (AstConvertError {| message = "dll_entry_point extern function attribute should have string or integer value" |})
         | a, _ -> raise (AstConvertError {| message = $"illegal extern function attribute: {a}" |})
 
     let private toFun
@@ -216,7 +215,7 @@ module AstConvert =
         ( { name = name
             type_ = type_
             attributes = attributes } : Cst.ExternFunDefinition) : Ast.ExternFunDefinition =
-        let initial : Ast.ExternFunAttrs = { dll_import = None; entry_point = None; entry_point_num = None }
+        let initial : Ast.ExternFunAttrs = { dll_import = None; dll_entry_point_name = None; dll_entry_point_ordinal = None }
         let attrs = foldAttrLists fromExternFunAttr initial attributes
         { name = name
           type_ = toFunType type_
