@@ -4,6 +4,8 @@ open System.IO
 
 module Driver =
 
+    exception DriverError of {| message: string |}
+
     type Verbosity =
         | Silent
         | Normal
@@ -72,3 +74,7 @@ module Driver =
         match config.astParserOutput with
         | Some fileName -> writeAstOutput fileName modules
         | _ -> ()
+
+        match config.exeOutput with
+        | Some exeName -> PeCoff.writeExe exeName
+        | None -> ()
