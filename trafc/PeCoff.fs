@@ -9,6 +9,7 @@ module PeCoff =
         {
             NumberOfSections: uint16
             TimeDateStamp: uint32
+            SizeOfOptionalHeader: uint16
             MajorLinkerVersion: uint8
             MinorLinkerVersion: uint8
             SizeOfCode: uint
@@ -40,13 +41,6 @@ module PeCoff =
             NumberOfRvaAndSizes: uint
         }
 
-    let peSignatureOffset = 0x40
-    let coffHeaderOffset = peSignatureOffset + 4
-    let optionalHeaderOffset = 0x58
-
-    let sectionTableOffset = 0x200
-
-    let SizeOfOptionalHeader = uint16 (sectionTableOffset - 0x14 - 0x18)
 
     [<System.Flags>]
     type Characteristics =
@@ -93,72 +87,83 @@ module PeCoff =
             Reserved: DataDirectoryItem
         }
 
+    let writeUint8 (image: byte array) (offset: int) (i: uint8) =
+        image.[offset] <- i
+
+    let writeUint16 (image: byte array) (offset: int) (i: uint16) =
+        image.[offset] <- (byte (i &&& 0xffus))
+        image.[offset + 1] <- (byte ((i >>> 8) &&& 0xffus))
+
+    let writeUint32 (image: byte array) (offset: int) (i: uint32) =
+        image.[offset] <- (byte (i &&& 0xffu))
+        image.[offset + 1] <- (byte ((i >>> 8) &&& 0xffu))
+        image.[offset + 2] <- (byte ((i >>> 16) &&& 0xffu))
+        image.[offset + 3] <- (byte ((i >>> 32) &&& 0xffu))
+
+    let writeInt32 (image: byte array) (offset: int) (i: int32) =
+        image.[offset] <- (byte (i &&& 0xff))
+        image.[offset + 1] <- (byte ((i >>> 8) &&& 0xff))
+        image.[offset + 2] <- (byte ((i >>> 16) &&& 0xff))
+        image.[offset + 3] <- (byte ((i >>> 32) &&& 0xff))
+
     let writeMzHeader (image: byte array) (offset: int) (peHeaderOffset: int) =
         // MZ signature
-        BitConverter.TryWriteBytes(Span(image, offset, 2), 0x5A4Dus) |> ignore
+        writeUint16 image offset 0x5A4Dus
         // Offset of PE header
-        BitConverter.TryWriteBytes(Span(image, offset + 0x3C, 4), peHeaderOffset) |> ignore
+        writeInt32 image (offset + 0x3C) peHeaderOffset
 
     let writePeSignature (image: byte array) (offset: int) =
-        BitConverter.TryWriteBytes(Span(image, offset, 4), 0x00004550) |> ignore
+        writeInt32 image offset 0x00004550
 
     let writeCoffHeader (image: byte array) (offset: int) (header: Header) =
-        // Machine = IMAGE_FILE_MACHINE_I386
-        BitConverter.TryWriteBytes(Span(image, offset, 2), 0x014Cus) |> ignore
-        BitConverter.TryWriteBytes(Span(image, offset + 2, 2), header.NumberOfSections) |> ignore
-        BitConverter.TryWriteBytes(Span(image, offset + 4, 4), header.TimeDateStamp) |> ignore
-        // PointerToSymbolTable
-        BitConverter.TryWriteBytes(Span(image, offset + 8, 4), 0) |> ignore
-        // NumberOfSymbols
-        BitConverter.TryWriteBytes(Span(image, offset + 12, 4), 0) |> ignore
-        BitConverter.TryWriteBytes(Span(image, offset + 16, 2), SizeOfOptionalHeader) |> ignore
-        // Characteristics
+        writeUint16 image offset 0x014Cus // Machine = IMAGE_FILE_MACHINE_I386
+        writeUint16 image (offset + 2) header.NumberOfSections
+        writeUint32 image (offset + 4) header.TimeDateStamp
+        writeUint32 image (offset + 8) 0u // PointerToSymbolTable
+        writeUint32 image (offset + 12) 0u // NumberOfSymbols
+        writeUint16 image (offset + 16) header.SizeOfOptionalHeader
         let characteristics = Characteristics.IMAGE_FILE_RELOCS_STRIPPED
                               ||| Characteristics.IMAGE_FILE_EXECUTABLE_IMAGE
                               ||| Characteristics.IMAGE_FILE_LINE_NUMS_STRIPPED
                               ||| Characteristics.IMAGE_FILE_LOCAL_SYMS_STRIPPED
                               ||| Characteristics.IMAGE_FILE_32BIT_MACHINE
-        BitConverter.TryWriteBytes(Span(image, offset + 18, 2), uint16 characteristics) |> ignore
+        writeUint16 image (offset + 18) (uint16 characteristics)
 
     let writeOptionalHeader (image: byte array) (offset: int) (header: Header) =
-        // Magic PE32
-        BitConverter.TryWriteBytes(Span(image, offset, 2), 0x010Bus) |> ignore
-        // Linker version
-        image.[2] <- header.MajorLinkerVersion
-        image.[3] <- header.MinorLinkerVersion
-        BitConverter.TryWriteBytes(Span(image, offset + 4, 4), header.SizeOfCode) |> ignore
-        BitConverter.TryWriteBytes(Span(image, offset + 8, 4), header.SizeOfInitializedData) |> ignore
-        BitConverter.TryWriteBytes(Span(image, offset + 12, 4), header.SizeOfUninitializedData) |> ignore
-        BitConverter.TryWriteBytes(Span(image, offset + 16, 4), header.AddressOfEntryPoint) |> ignore
-        BitConverter.TryWriteBytes(Span(image, offset + 20, 4), header.BaseOfCode) |> ignore
-        BitConverter.TryWriteBytes(Span(image, offset + 24, 4), header.BaseOfData) |> ignore
-
-    let writeOptionalWindowsHeader (image: byte array) (offset: int) (header: Header) =
-        BitConverter.TryWriteBytes(Span(image, offset + 28, 4), header.ImageBase) |> ignore
-        BitConverter.TryWriteBytes(Span(image, offset + 32, 4), header.SectionAlignment) |> ignore
-        BitConverter.TryWriteBytes(Span(image, offset + 36, 4), header.FileAlignment) |> ignore
-        BitConverter.TryWriteBytes(Span(image, offset + 40, 2), header.MajorOperatingSystemVersion) |> ignore
-        BitConverter.TryWriteBytes(Span(image, offset + 42, 2), header.MinorOperatingSystemVersion) |> ignore
-        BitConverter.TryWriteBytes(Span(image, offset + 44, 2), header.MajorImageVersion) |> ignore
-        BitConverter.TryWriteBytes(Span(image, offset + 46, 2), header.MinorImageVersion) |> ignore
-        BitConverter.TryWriteBytes(Span(image, offset + 48, 2), header.MajorSubsystemVersion) |> ignore
-        BitConverter.TryWriteBytes(Span(image, offset + 50, 2), header.MinorSubsystemVersion) |> ignore
-        BitConverter.TryWriteBytes(Span(image, offset + 52, 4), header.Win32VersionValue) |> ignore
-        BitConverter.TryWriteBytes(Span(image, offset + 56, 4), header.SizeOfImage) |> ignore
-        BitConverter.TryWriteBytes(Span(image, offset + 60, 4), header.SizeOfHeaders) |> ignore
-        BitConverter.TryWriteBytes(Span(image, offset + 64, 4), header.CheckSum) |> ignore
-        BitConverter.TryWriteBytes(Span(image, offset + 68, 2), header.Subsystem) |> ignore
-        BitConverter.TryWriteBytes(Span(image, offset + 70, 2), header.DllCharacteristics) |> ignore
-        BitConverter.TryWriteBytes(Span(image, offset + 72, 4), header.SizeOfStackReserve) |> ignore
-        BitConverter.TryWriteBytes(Span(image, offset + 76, 4), header.SizeOfStackCommit) |> ignore
-        BitConverter.TryWriteBytes(Span(image, offset + 80, 4), header.SizeOfHeapReserve) |> ignore
-        BitConverter.TryWriteBytes(Span(image, offset + 84, 4), header.SizeOfHeapCommit) |> ignore
-        BitConverter.TryWriteBytes(Span(image, offset + 88, 4), header.LoaderFlags) |> ignore
-        BitConverter.TryWriteBytes(Span(image, offset + 92, 4), header.NumberOfRvaAndSizes) |> ignore
+        writeUint16 image offset 0x010Bus // Magic PE32
+        writeUint8 image (offset + 2) header.MajorLinkerVersion
+        writeUint8 image (offset + 3) header.MinorLinkerVersion
+        writeUint32 image (offset + 4) header.SizeOfCode
+        writeUint32 image (offset + 8) header.SizeOfInitializedData
+        writeUint32 image (offset + 12) header.SizeOfUninitializedData
+        writeUint32 image (offset + 16) header.AddressOfEntryPoint
+        writeUint32 image (offset + 20) header.BaseOfCode
+        writeUint32 image (offset + 24) header.BaseOfData
+        writeUint32 image (offset + 28) header.ImageBase
+        writeUint32 image (offset + 32) header.SectionAlignment
+        writeUint32 image (offset + 36) header.FileAlignment
+        writeUint16 image (offset + 40) header.MajorOperatingSystemVersion
+        writeUint16 image (offset + 42) header.MinorOperatingSystemVersion
+        writeUint16 image (offset + 44) header.MajorImageVersion
+        writeUint16 image (offset + 46) header.MinorImageVersion
+        writeUint16 image (offset + 48) header.MajorSubsystemVersion
+        writeUint16 image (offset + 50) header.MinorSubsystemVersion
+        writeUint32 image (offset + 52) header.Win32VersionValue
+        writeUint32 image (offset + 56) header.SizeOfImage
+        writeUint32 image (offset + 60) header.SizeOfHeaders
+        writeUint32 image (offset + 64) header.CheckSum
+        writeUint16 image (offset + 68) header.Subsystem
+        writeUint16 image (offset + 70) header.DllCharacteristics
+        writeUint32 image (offset + 72) header.SizeOfStackReserve
+        writeUint32 image (offset + 76) header.SizeOfStackCommit
+        writeUint32 image (offset + 80) header.SizeOfHeapReserve
+        writeUint32 image (offset + 84) header.SizeOfHeapCommit
+        writeUint32 image (offset + 88) header.LoaderFlags
+        writeUint32 image (offset + 92) header.NumberOfRvaAndSizes
 
     let writeDataDirectoryItem (image: byte array) (offset: int) (dataDirectoryItem: DataDirectoryItem) =
-        BitConverter.TryWriteBytes(Span(image, offset, 4), dataDirectoryItem.VirtualAddress) |> ignore
-        BitConverter.TryWriteBytes(Span(image, offset + 4, 4), dataDirectoryItem.Size) |> ignore
+        writeUint32 image offset dataDirectoryItem.VirtualAddress
+        writeUint32 image (offset + 4) dataDirectoryItem.Size
 
     let writeDataDirectory (image: byte array) (offset: int) (dataDirectory: DataDirectory) =
         writeDataDirectoryItem image offset dataDirectory.ExportTable
@@ -179,10 +184,18 @@ module PeCoff =
         writeDataDirectoryItem image (offset + 120) dataDirectory.Reserved
 
     let writeHeader (image: byte array) =
+        let peSignatureOffset = 0x40
+        let coffHeaderOffset = peSignatureOffset + 4
+        let optionalHeaderOffset = 0x58
+        let sectionTableOffset = 0x200
+
+        let SizeOfOptionalHeader = uint16 (sectionTableOffset - 0x14 - 0x18)
+
         let header =
             {
                 NumberOfSections = 1us
                 TimeDateStamp = 0u
+                SizeOfOptionalHeader = SizeOfOptionalHeader
                 MajorLinkerVersion = 0uy
                 MinorLinkerVersion = 0uy
                 SizeOfCode = 0u
@@ -234,11 +247,11 @@ module PeCoff =
                 Reserved = { VirtualAddress = 0u; Size = 0u }
             }
 
+
         writeMzHeader image 0 peSignatureOffset
         writePeSignature image peSignatureOffset
         writeCoffHeader image coffHeaderOffset header
         writeOptionalHeader image optionalHeaderOffset header
-        writeOptionalWindowsHeader image optionalHeaderOffset header
         writeDataDirectory image (optionalHeaderOffset + 96) dataDirectory
         ()
 
