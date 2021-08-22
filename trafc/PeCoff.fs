@@ -3,13 +3,42 @@ namespace Triton
 open System
 open System.IO
 
-module PeCoff =
+module LinkTypes =
+
+    type Section =
+        {
+            contents: byte array
+            virtualSize: int
+        }
+
+module PeCoffAllocateTypes =
+
+    open LinkTypes
+
+    [<System.Flags>]
+    type Characteristics =
+    | IMAGE_FILE_RELOCS_STRIPPED = 0x0001us // Relocation info stripped from file.
+    | IMAGE_FILE_EXECUTABLE_IMAGE = 0x0002us // File is executable (i.e. no unresolved externel references).
+    | IMAGE_FILE_LINE_NUMS_STRIPPED = 0x0004us // Line nunbers stripped from file.
+    | IMAGE_FILE_LOCAL_SYMS_STRIPPED = 0x0008us // Local symbols stripped from file.
+    | IMAGE_FILE_AGGRESIVE_WS_TRIM = 0x0010us // Agressively trim working set
+    | IMAGE_FILE_LARGE_ADDRESS_AWARE = 0x0020us // App can handle >2gb addresses
+    | IMAGE_FILE_BYTES_REVERSED_LO = 0x0080us // Bytes of machine word are reversed.
+    | IMAGE_FILE_32BIT_MACHINE = 0x0100us // 32 bit word machine.
+    | IMAGE_FILE_DEBUG_STRIPPED = 0x0200us // Debugging info stripped from file in .DBG file
+    | IMAGE_FILE_REMOVABLE_RUN_FROM_SWAP = 0x0400us // If Image is on removable media, copy and run from the swap file.
+    | IMAGE_FILE_NET_RUN_FROM_SWAP = 0x0800us // If Image is on Net, copy and run from the swap file.
+    | IMAGE_FILE_SYSTEM = 0x1000us // System File.
+    | IMAGE_FILE_DLL = 0x2000us // File is a DLL.
+    | IMAGE_FILE_UP_SYSTEM_ONLY = 0x4000us // File should only be run on a UP machine
+    | IMAGE_FILE_BYTES_REVERSED_HI = 0x8000us // Bytes of machine word are reversed.
 
     type Header =
         {
             NumberOfSections: uint16
             TimeDateStamp: uint32
             SizeOfOptionalHeader: uint16
+            Characteristics: Characteristics
             MajorLinkerVersion: uint8
             MinorLinkerVersion: uint8
             SizeOfCode: uint
@@ -41,25 +70,6 @@ module PeCoff =
             NumberOfRvaAndSizes: uint
         }
 
-
-    [<System.Flags>]
-    type Characteristics =
-    | IMAGE_FILE_RELOCS_STRIPPED = 0x0001us // Relocation info stripped from file.
-    | IMAGE_FILE_EXECUTABLE_IMAGE = 0x0002us // File is executable (i.e. no unresolved externel references).
-    | IMAGE_FILE_LINE_NUMS_STRIPPED = 0x0004us // Line nunbers stripped from file.
-    | IMAGE_FILE_LOCAL_SYMS_STRIPPED = 0x0008us // Local symbols stripped from file.
-    | IMAGE_FILE_AGGRESIVE_WS_TRIM = 0x0010us // Agressively trim working set
-    | IMAGE_FILE_LARGE_ADDRESS_AWARE = 0x0020us // App can handle >2gb addresses
-    | IMAGE_FILE_BYTES_REVERSED_LO = 0x0080us // Bytes of machine word are reversed.
-    | IMAGE_FILE_32BIT_MACHINE = 0x0100us // 32 bit word machine.
-    | IMAGE_FILE_DEBUG_STRIPPED = 0x0200us // Debugging info stripped from file in .DBG file
-    | IMAGE_FILE_REMOVABLE_RUN_FROM_SWAP = 0x0400us // If Image is on removable media, copy and run from the swap file.
-    | IMAGE_FILE_NET_RUN_FROM_SWAP = 0x0800us // If Image is on Net, copy and run from the swap file.
-    | IMAGE_FILE_SYSTEM = 0x1000us // System File.
-    | IMAGE_FILE_DLL = 0x2000us // File is a DLL.
-    | IMAGE_FILE_UP_SYSTEM_ONLY = 0x4000us // File should only be run on a UP machine
-    | IMAGE_FILE_BYTES_REVERSED_HI = 0x8000us // Bytes of machine word are reversed.
-
     [<Struct>]
     type DataDirectoryItem =
         {
@@ -87,115 +97,119 @@ module PeCoff =
             Reserved: DataDirectoryItem
         }
 
-    let writeUint8 (image: byte array) (offset: int) (i: uint8) =
-        image.[offset] <- i
+    type SectionHeader =
+        {
+            SectionName: string
+            VirtualSize: uint32
+            VirtualAddress: uint32
+            SizeOfRawData: uint32
+            PointerToRawData: uint32
+            PointerToRelocations: uint32
+            PointerToLineNumbers: uint32
+            NumberOfRelocations: uint16
+            NumberOfLineNumbers: uint16
+            SectionCharacteristics: uint32
+        }
 
-    let writeUint16 (image: byte array) (offset: int) (i: uint16) =
-        image.[offset] <- (byte (i &&& 0xffus))
-        image.[offset + 1] <- (byte ((i >>> 8) &&& 0xffus))
+    type Region =
+        {
+            offset: int
+            size: int
+        }
 
-    let writeUint32 (image: byte array) (offset: int) (i: uint32) =
-        image.[offset] <- (byte (i &&& 0xffu))
-        image.[offset + 1] <- (byte ((i >>> 8) &&& 0xffu))
-        image.[offset + 2] <- (byte ((i >>> 16) &&& 0xffu))
-        image.[offset + 3] <- (byte ((i >>> 32) &&& 0xffu))
+    type AllocatedSection =
+        {
+            section: Section
+            fileRegion: Region
+            virtualRegion: Region
+        }
 
-    let writeInt32 (image: byte array) (offset: int) (i: int32) =
-        image.[offset] <- (byte (i &&& 0xff))
-        image.[offset + 1] <- (byte ((i >>> 8) &&& 0xff))
-        image.[offset + 2] <- (byte ((i >>> 16) &&& 0xff))
-        image.[offset + 3] <- (byte ((i >>> 32) &&& 0xff))
+    type PeCoffInfo =
+        {
+            header: Header
+            dataDirectory: DataDirectory
+            sectionsTable: SectionHeader list
+            sections: AllocatedSection list
+            mzHeaderRegion: Region
+            peSignatureRegion: Region
+            coffHeaderRegion: Region
+            optionalHeaderRegion: Region
+            dataDirectoryRegion: Region
+            sectionTableRegion: Region
+            fileSize: int
+        }
 
-    let writeMzHeader (image: byte array) (offset: int) (peHeaderOffset: int) =
-        // MZ signature
-        writeUint16 image offset 0x5A4Dus
-        // Offset of PE header
-        writeInt32 image (offset + 0x3C) peHeaderOffset
+module PeCoffTypes =
 
-    let writePeSignature (image: byte array) (offset: int) =
-        writeInt32 image offset 0x00004550
+    exception ExeOutputError of {| message: string |}
 
-    let writeCoffHeader (image: byte array) (offset: int) (header: Header) =
-        writeUint16 image offset 0x014Cus // Machine = IMAGE_FILE_MACHINE_I386
-        writeUint16 image (offset + 2) header.NumberOfSections
-        writeUint32 image (offset + 4) header.TimeDateStamp
-        writeUint32 image (offset + 8) 0u // PointerToSymbolTable
-        writeUint32 image (offset + 12) 0u // NumberOfSymbols
-        writeUint16 image (offset + 16) header.SizeOfOptionalHeader
-        let characteristics = Characteristics.IMAGE_FILE_RELOCS_STRIPPED
-                              ||| Characteristics.IMAGE_FILE_EXECUTABLE_IMAGE
-                              ||| Characteristics.IMAGE_FILE_LINE_NUMS_STRIPPED
-                              ||| Characteristics.IMAGE_FILE_LOCAL_SYMS_STRIPPED
-                              ||| Characteristics.IMAGE_FILE_32BIT_MACHINE
-        writeUint16 image (offset + 18) (uint16 characteristics)
+module PeCoffAllocate =
 
-    let writeOptionalHeader (image: byte array) (offset: int) (header: Header) =
-        writeUint16 image offset 0x010Bus // Magic PE32
-        writeUint8 image (offset + 2) header.MajorLinkerVersion
-        writeUint8 image (offset + 3) header.MinorLinkerVersion
-        writeUint32 image (offset + 4) header.SizeOfCode
-        writeUint32 image (offset + 8) header.SizeOfInitializedData
-        writeUint32 image (offset + 12) header.SizeOfUninitializedData
-        writeUint32 image (offset + 16) header.AddressOfEntryPoint
-        writeUint32 image (offset + 20) header.BaseOfCode
-        writeUint32 image (offset + 24) header.BaseOfData
-        writeUint32 image (offset + 28) header.ImageBase
-        writeUint32 image (offset + 32) header.SectionAlignment
-        writeUint32 image (offset + 36) header.FileAlignment
-        writeUint16 image (offset + 40) header.MajorOperatingSystemVersion
-        writeUint16 image (offset + 42) header.MinorOperatingSystemVersion
-        writeUint16 image (offset + 44) header.MajorImageVersion
-        writeUint16 image (offset + 46) header.MinorImageVersion
-        writeUint16 image (offset + 48) header.MajorSubsystemVersion
-        writeUint16 image (offset + 50) header.MinorSubsystemVersion
-        writeUint32 image (offset + 52) header.Win32VersionValue
-        writeUint32 image (offset + 56) header.SizeOfImage
-        writeUint32 image (offset + 60) header.SizeOfHeaders
-        writeUint32 image (offset + 64) header.CheckSum
-        writeUint16 image (offset + 68) header.Subsystem
-        writeUint16 image (offset + 70) header.DllCharacteristics
-        writeUint32 image (offset + 72) header.SizeOfStackReserve
-        writeUint32 image (offset + 76) header.SizeOfStackCommit
-        writeUint32 image (offset + 80) header.SizeOfHeapReserve
-        writeUint32 image (offset + 84) header.SizeOfHeapCommit
-        writeUint32 image (offset + 88) header.LoaderFlags
-        writeUint32 image (offset + 92) header.NumberOfRvaAndSizes
+    open LinkTypes
+    open PeCoffAllocateTypes
 
-    let writeDataDirectoryItem (image: byte array) (offset: int) (dataDirectoryItem: DataDirectoryItem) =
-        writeUint32 image offset dataDirectoryItem.VirtualAddress
-        writeUint32 image (offset + 4) dataDirectoryItem.Size
+    let sectionAlignmentBits = 12
+    let fileAlignmentBits = 9
 
-    let writeDataDirectory (image: byte array) (offset: int) (dataDirectory: DataDirectory) =
-        writeDataDirectoryItem image offset dataDirectory.ExportTable
-        writeDataDirectoryItem image (offset + 8) dataDirectory.ImportTable
-        writeDataDirectoryItem image (offset + 16) dataDirectory.ResourceTable
-        writeDataDirectoryItem image (offset + 24) dataDirectory.ExceptionTable
-        writeDataDirectoryItem image (offset + 32) dataDirectory.CertificateTable
-        writeDataDirectoryItem image (offset + 40) dataDirectory.BaseRelocationTable
-        writeDataDirectoryItem image (offset + 48) dataDirectory.Debug
-        writeDataDirectoryItem image (offset + 56) dataDirectory.Architecture
-        writeDataDirectoryItem image (offset + 64) dataDirectory.GlobalPtr
-        writeDataDirectoryItem image (offset + 72) dataDirectory.TLSTable
-        writeDataDirectoryItem image (offset + 80) dataDirectory.LoadConfigTable
-        writeDataDirectoryItem image (offset + 88) dataDirectory.BoundImport
-        writeDataDirectoryItem image (offset + 96) dataDirectory.IAT
-        writeDataDirectoryItem image (offset + 104) dataDirectory.DelayImportDescriptor
-        writeDataDirectoryItem image (offset + 112) dataDirectory.CLRRuntimeHeader
-        writeDataDirectoryItem image (offset + 120) dataDirectory.Reserved
+    let align bits value = (((value - 1) >>> bits) + 1) <<< bits
 
-    let writeHeader (image: byte array) =
-        let peSignatureOffset = 0x40
-        let coffHeaderOffset = peSignatureOffset + 4
-        let optionalHeaderOffset = 0x58
-        let sectionTableOffset = 0x200
+    let allocateSections fileOffset virtualAddress sections =
+        let allocateSection (acc, fileOffset, virtualAddress) (section: Section) =
+            let fileOffset = align fileAlignmentBits fileOffset
+            let fileSize = align fileAlignmentBits section.contents.Length
+            let virtualAddress = align sectionAlignmentBits virtualAddress
+            let virtualSize = align sectionAlignmentBits section.virtualSize
+            let allocatedSection =
+                {
+                    section = section
+                    fileRegion = { offset = fileOffset; size = fileSize }
+                    virtualRegion = { offset = virtualAddress; size = virtualSize }
+                }
+            (allocatedSection :: acc, fileOffset + fileSize, virtualAddress + virtualSize)
+        let (allocatedSectionRev, fileOffset, virtualAddress) = List.fold allocateSection ([], fileOffset, virtualAddress) sections
+        (List.rev allocatedSectionRev, fileOffset, virtualAddress)
 
-        let SizeOfOptionalHeader = uint16 (sectionTableOffset - 0x14 - 0x18)
+    let calcEnd { offset = offset; size = size } = offset + size
+
+    let allocate (sections: Section list): PeCoffInfo =
+
+        let numSections = List.length sections
+
+        let fileOffset = 0
+        let virtualAddress = 0
+
+        let mzHeaderRegion = { offset = fileOffset; size = 0x40 }
+        let fileOffset = calcEnd mzHeaderRegion
+
+        let peSignatureRegion = { offset = fileOffset; size = 4 }
+        let fileOffset = calcEnd peSignatureRegion
+
+        let coffHeaderRegion = { offset = fileOffset; size = 20 }
+        let fileOffset = calcEnd coffHeaderRegion
+
+        let optionalHeaderRegion = { offset = fileOffset; size = 96 }
+        let fileOffset = calcEnd optionalHeaderRegion
+
+        let dataDirectoryRegion = { offset = fileOffset; size = 16 * 8 }
+        let fileOffset = calcEnd dataDirectoryRegion
+
+        let sectionTableRegion = { offset = fileOffset; size = 40 * numSections }
+        let fileOffset = calcEnd sectionTableRegion
+
+        let allocatedSections, fileOffset, virtualAddress = allocateSections fileOffset virtualAddress sections
+
+        let fileSize = fileOffset
 
         let header =
             {
-                NumberOfSections = 1us
+                NumberOfSections = uint16 numSections
                 TimeDateStamp = 0u
-                SizeOfOptionalHeader = SizeOfOptionalHeader
+                SizeOfOptionalHeader = uint16 (optionalHeaderRegion.size + dataDirectoryRegion.size)
+                Characteristics = Characteristics.IMAGE_FILE_RELOCS_STRIPPED
+                                  ||| Characteristics.IMAGE_FILE_EXECUTABLE_IMAGE
+                                  ||| Characteristics.IMAGE_FILE_LINE_NUMS_STRIPPED
+                                  ||| Characteristics.IMAGE_FILE_LOCAL_SYMS_STRIPPED
+                                  ||| Characteristics.IMAGE_FILE_32BIT_MACHINE
                 MajorLinkerVersion = 0uy
                 MinorLinkerVersion = 0uy
                 SizeOfCode = 0u
@@ -247,17 +261,187 @@ module PeCoff =
                 Reserved = { VirtualAddress = 0u; Size = 0u }
             }
 
+        let sectionsTable = [
+            {
+                SectionName = "qwe"
+                VirtualSize = 0u
+                VirtualAddress = 0u
+                SizeOfRawData = 0u
+                PointerToRawData = 0u
+                PointerToRelocations = 0u
+                PointerToLineNumbers = 0u
+                NumberOfRelocations = 0us
+                NumberOfLineNumbers = 0us
+                SectionCharacteristics = 0u
+            } ]
 
-        writeMzHeader image 0 peSignatureOffset
-        writePeSignature image peSignatureOffset
-        writeCoffHeader image coffHeaderOffset header
-        writeOptionalHeader image optionalHeaderOffset header
-        writeDataDirectory image (optionalHeaderOffset + 96) dataDirectory
-        ()
+        {
+            header = header
+            dataDirectory = dataDirectory
+            sectionsTable = sectionsTable
+            sections = allocatedSections
+            mzHeaderRegion = mzHeaderRegion
+            peSignatureRegion = peSignatureRegion
+            coffHeaderRegion = coffHeaderRegion
+            optionalHeaderRegion = optionalHeaderRegion
+            dataDirectoryRegion = dataDirectoryRegion
+            sectionTableRegion = sectionTableRegion
+            fileSize = fileSize
+        }
+
+module PeCoffWrite =
+
+    open PeCoffAllocateTypes
+    open PeCoffTypes
+
+    let writeUint8 (image: byte array) (offset: int) (i: uint8) =
+        image.[offset] <- i
+
+    let writeUint16 (image: byte array) (offset: int) (i: uint16) =
+        image.[offset] <- (byte (i &&& 0xffus))
+        image.[offset + 1] <- (byte ((i >>> 8) &&& 0xffus))
+
+    let writeUint32 (image: byte array) (offset: int) (i: uint32) =
+        image.[offset] <- (byte (i &&& 0xffu))
+        image.[offset + 1] <- (byte ((i >>> 8) &&& 0xffu))
+        image.[offset + 2] <- (byte ((i >>> 16) &&& 0xffu))
+        image.[offset + 3] <- (byte ((i >>> 32) &&& 0xffu))
+
+    let writeInt32 (image: byte array) (offset: int) (i: int32) =
+        image.[offset] <- (byte (i &&& 0xff))
+        image.[offset + 1] <- (byte ((i >>> 8) &&& 0xff))
+        image.[offset + 2] <- (byte ((i >>> 16) &&& 0xff))
+        image.[offset + 3] <- (byte ((i >>> 32) &&& 0xff))
+
+    let writeMzHeader (image: byte array) (region: Region) (peSignatureRegion: Region) =
+        let offset = region.offset
+        // MZ signature
+        writeUint16 image offset 0x5A4Dus
+        // Offset of PE header
+        writeInt32 image (offset + 0x3C) peSignatureRegion.offset
+
+    let writePeSignature (image: byte array) (region: Region) =
+        let offset = region.offset
+        writeInt32 image offset 0x00004550
+
+    let writeCoffHeader (image: byte array) (region: Region) (header: Header) =
+        let offset = region.offset
+        writeUint16 image offset 0x014Cus // Machine = IMAGE_FILE_MACHINE_I386
+        writeUint16 image (offset + 2) header.NumberOfSections
+        writeUint32 image (offset + 4) header.TimeDateStamp
+        writeUint32 image (offset + 8) 0u // PointerToSymbolTable
+        writeUint32 image (offset + 12) 0u // NumberOfSymbols
+        writeUint16 image (offset + 16) header.SizeOfOptionalHeader
+        let characteristics = Characteristics.IMAGE_FILE_RELOCS_STRIPPED
+                              ||| Characteristics.IMAGE_FILE_EXECUTABLE_IMAGE
+                              ||| Characteristics.IMAGE_FILE_LINE_NUMS_STRIPPED
+                              ||| Characteristics.IMAGE_FILE_LOCAL_SYMS_STRIPPED
+                              ||| Characteristics.IMAGE_FILE_32BIT_MACHINE
+        writeUint16 image (offset + 18) (uint16 characteristics)
+
+    let writeOptionalHeader (image: byte array) (region: Region) (header: Header) =
+        let offset = region.offset
+        writeUint16 image offset 0x010Bus // Magic PE32
+        writeUint8 image (offset + 2) header.MajorLinkerVersion
+        writeUint8 image (offset + 3) header.MinorLinkerVersion
+        writeUint32 image (offset + 4) header.SizeOfCode
+        writeUint32 image (offset + 8) header.SizeOfInitializedData
+        writeUint32 image (offset + 12) header.SizeOfUninitializedData
+        writeUint32 image (offset + 16) header.AddressOfEntryPoint
+        writeUint32 image (offset + 20) header.BaseOfCode
+        writeUint32 image (offset + 24) header.BaseOfData
+        writeUint32 image (offset + 28) header.ImageBase
+        writeUint32 image (offset + 32) header.SectionAlignment
+        writeUint32 image (offset + 36) header.FileAlignment
+        writeUint16 image (offset + 40) header.MajorOperatingSystemVersion
+        writeUint16 image (offset + 42) header.MinorOperatingSystemVersion
+        writeUint16 image (offset + 44) header.MajorImageVersion
+        writeUint16 image (offset + 46) header.MinorImageVersion
+        writeUint16 image (offset + 48) header.MajorSubsystemVersion
+        writeUint16 image (offset + 50) header.MinorSubsystemVersion
+        writeUint32 image (offset + 52) header.Win32VersionValue
+        writeUint32 image (offset + 56) header.SizeOfImage
+        writeUint32 image (offset + 60) header.SizeOfHeaders
+        writeUint32 image (offset + 64) header.CheckSum
+        writeUint16 image (offset + 68) header.Subsystem
+        writeUint16 image (offset + 70) header.DllCharacteristics
+        writeUint32 image (offset + 72) header.SizeOfStackReserve
+        writeUint32 image (offset + 76) header.SizeOfStackCommit
+        writeUint32 image (offset + 80) header.SizeOfHeapReserve
+        writeUint32 image (offset + 84) header.SizeOfHeapCommit
+        writeUint32 image (offset + 88) header.LoaderFlags
+        writeUint32 image (offset + 92) header.NumberOfRvaAndSizes
+
+    let writeDataDirectoryItem (image: byte array) (offset: int) (dataDirectoryItem: DataDirectoryItem) =
+        writeUint32 image offset dataDirectoryItem.VirtualAddress
+        writeUint32 image (offset + 4) dataDirectoryItem.Size
+
+    let writeDataDirectory (image: byte array) (region: Region) (dataDirectory: DataDirectory) =
+        let offset = region.offset
+        writeDataDirectoryItem image offset dataDirectory.ExportTable
+        writeDataDirectoryItem image (offset + 8) dataDirectory.ImportTable
+        writeDataDirectoryItem image (offset + 16) dataDirectory.ResourceTable
+        writeDataDirectoryItem image (offset + 24) dataDirectory.ExceptionTable
+        writeDataDirectoryItem image (offset + 32) dataDirectory.CertificateTable
+        writeDataDirectoryItem image (offset + 40) dataDirectory.BaseRelocationTable
+        writeDataDirectoryItem image (offset + 48) dataDirectory.Debug
+        writeDataDirectoryItem image (offset + 56) dataDirectory.Architecture
+        writeDataDirectoryItem image (offset + 64) dataDirectory.GlobalPtr
+        writeDataDirectoryItem image (offset + 72) dataDirectory.TLSTable
+        writeDataDirectoryItem image (offset + 80) dataDirectory.LoadConfigTable
+        writeDataDirectoryItem image (offset + 88) dataDirectory.BoundImport
+        writeDataDirectoryItem image (offset + 96) dataDirectory.IAT
+        writeDataDirectoryItem image (offset + 104) dataDirectory.DelayImportDescriptor
+        writeDataDirectoryItem image (offset + 112) dataDirectory.CLRRuntimeHeader
+        writeDataDirectoryItem image (offset + 120) dataDirectory.Reserved
+
+    let writeSectionHeader (image: byte array) (offset: int) (sectionHeader: SectionHeader) =
+        let x = System.Text.Encoding.UTF8.GetBytes(sectionHeader.SectionName)
+        if x.Length > 8 then raise (ExeOutputError {| message = $"Section name \"{sectionHeader.SectionName}\" should not exceed 8 bytes encoded in UTF-8" |})
+        x.CopyTo(image, offset)
+        writeUint32 image (offset + 8) sectionHeader.VirtualSize
+        writeUint32 image (offset + 12) sectionHeader.VirtualAddress
+        writeUint32 image (offset + 16) sectionHeader.SizeOfRawData
+        writeUint32 image (offset + 20) sectionHeader.PointerToRawData
+        writeUint32 image (offset + 24) sectionHeader.PointerToRelocations
+        writeUint32 image (offset + 28) sectionHeader.PointerToLineNumbers
+        writeUint16 image (offset + 32) sectionHeader.NumberOfRelocations
+        writeUint16 image (offset + 34) sectionHeader.NumberOfLineNumbers
+        writeUint32 image (offset + 36) sectionHeader.SectionCharacteristics
+
+    let writeSectionsTable (image: byte array) (region: Region) (headers: SectionHeader list) =
+        List.fold (fun offset header -> writeSectionHeader image offset header; offset + 40) region.offset headers |> ignore
+
+    let writeSection (image: byte array) (section: AllocatedSection) =
+        Array.Copy(section.section.contents, 0, image, section.fileRegion.offset, section.section.contents.Length)
+
+    let writeSections (image: byte array) (sections: AllocatedSection list) =
+        List.map (writeSection image) sections |> ignore
+
+    let getContents (peCoffInfo: PeCoffInfo): byte array =
+
+        let image = Array.zeroCreate peCoffInfo.fileSize
+
+        writeMzHeader image peCoffInfo.mzHeaderRegion peCoffInfo.peSignatureRegion
+        writePeSignature image peCoffInfo.peSignatureRegion
+        writeCoffHeader image peCoffInfo.coffHeaderRegion peCoffInfo.header
+        writeOptionalHeader image peCoffInfo.optionalHeaderRegion peCoffInfo.header
+        writeDataDirectory image peCoffInfo.dataDirectoryRegion peCoffInfo.dataDirectory
+        writeSectionsTable image peCoffInfo.sectionTableRegion peCoffInfo.sectionsTable
+        writeSections image peCoffInfo.sections
+
+        image
+
+module PeCoff =
+
+    open LinkTypes
+    open PeCoffAllocate
+    open PeCoffWrite
 
     let writeExe (file: string) =
-        let image = Array.zeroCreate 1024
-        writeHeader image
+        let sections = [
+            { contents = Array.zeroCreate 100; virtualSize = 100 } ]
+        let peCoffInfo = allocate sections
+        let image = getContents peCoffInfo
         use output = File.Create(file)
-        output.Write(image, 0, 1024)
-
+        output.Write(image, 0, image.Length)

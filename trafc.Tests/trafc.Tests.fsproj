@@ -10,6 +10,7 @@
   <ItemGroup>
     <Compile Include="lexer.fs" />
     <Compile Include="CstParser.fs" />
+    <Compile Include="PeCoff.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 
