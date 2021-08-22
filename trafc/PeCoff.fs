@@ -16,7 +16,8 @@ module PeCoffAllocateTypes =
     open LinkTypes
 
     [<System.Flags>]
-    type Characteristics =
+    type FileCharacteristics =
+    | None = 0us
     | IMAGE_FILE_RELOCS_STRIPPED = 0x0001us // Relocation info stripped from file.
     | IMAGE_FILE_EXECUTABLE_IMAGE = 0x0002us // File is executable (i.e. no unresolved externel references).
     | IMAGE_FILE_LINE_NUMS_STRIPPED = 0x0004us // Line nunbers stripped from file.
@@ -33,12 +34,17 @@ module PeCoffAllocateTypes =
     | IMAGE_FILE_UP_SYSTEM_ONLY = 0x4000us // File should only be run on a UP machine
     | IMAGE_FILE_BYTES_REVERSED_HI = 0x8000us // Bytes of machine word are reversed.
 
+    type Subsystem =
+    | IMAGE_SUBSYSTEM_WINDOWS_GUI = 2us // The Windows graphical user interface (GUI) subsystem
+    | IMAGE_SUBSYSTEM_WINDOWS_CUI = 3us // The Windows character subsystem
+
+
     type Header =
         {
             NumberOfSections: uint16
             TimeDateStamp: uint32
             SizeOfOptionalHeader: uint16
-            Characteristics: Characteristics
+            Characteristics: FileCharacteristics
             MajorLinkerVersion: uint8
             MinorLinkerVersion: uint8
             SizeOfCode: uint
@@ -60,7 +66,7 @@ module PeCoffAllocateTypes =
             SizeOfImage: uint
             SizeOfHeaders: uint
             CheckSum: uint
-            Subsystem: uint16
+            Subsystem: Subsystem
             DllCharacteristics: uint16
             SizeOfStackReserve: uint
             SizeOfStackCommit: uint
@@ -97,6 +103,45 @@ module PeCoffAllocateTypes =
             Reserved: DataDirectoryItem
         }
 
+    [<System.Flags>]
+    type SectionCharacteristics =
+    | None = 0
+    | IMAGE_SCN_TYPE_NO_PAD = 0x08 // The section should not be padded to the next boundary. This flag is obsolete and is replaced by IMAGE_SCN_ALIGN_1BYTES. This is valid only for object files.
+    | IMAGE_SCN_CNT_CODE = 0x20 // The section contains executable code.
+    | IMAGE_SCN_CNT_INITIALIZED_DATA = 0x40 // The section contains initialized data.
+    | IMAGE_SCN_CNT_UNINITIALIZED_DATA = 0x80 // The section contains uninitialized data.
+    | IMAGE_SCN_LNK_OTHER = 0x100 // Reserved for future use.
+    | IMAGE_SCN_LNK_INFO = 0x200 // The section contains comments or other information. The .drectve section has this type. This is valid for object files only.
+    | IMAGE_SCN_LNK_REMOVE = 0x800 // The section will not become part of the image. This is valid only for object files.
+    | IMAGE_SCN_LNK_COMDAT = 0x1000 // The section contains COMDAT data. For more information, see COMDAT Sections (Object Only). This is valid only for object files.
+    | IMAGE_SCN_GPREL = 0x8000 // The section contains data referenced through the global pointer (GP).
+    | IMAGE_SCN_MEM_PURGEABLE = 0x20000 // Reserved for future use.
+    | IMAGE_SCN_MEM_16BIT = 0x20000 // Reserved for future use.
+    | IMAGE_SCN_MEM_LOCKED = 0x40000 // Reserved for future use.
+    | IMAGE_SCN_MEM_PRELOAD = 0x80000 // Reserved for future use.
+    | IMAGE_SCN_ALIGN_1BYTES = 0x100000 // Align data on a 1-byte boundary. Valid only for object files.
+    | IMAGE_SCN_ALIGN_2BYTES = 0x200000 // Align data on a 2-byte boundary. Valid only for object files.
+    | IMAGE_SCN_ALIGN_4BYTES = 0x300000 // Align data on a 4-byte boundary. Valid only for object files.
+    | IMAGE_SCN_ALIGN_8BYTES = 0x400000 // Align data on a 8-byte boundary. Valid only for object files.
+    | IMAGE_SCN_ALIGN_16BYTES = 0x500000 // Align data on a 16-byte boundary. Valid only for object files.
+    | IMAGE_SCN_ALIGN_32BYTES = 0x600000 // Align data on a 32-byte boundary. Valid only for object files.
+    | IMAGE_SCN_ALIGN_64BYTES = 0x700000 // Align data on a 64-byte boundary. Valid only for object files.
+    | IMAGE_SCN_ALIGN_128BYTES = 0x800000 // Align data on a 128-byte boundary. Valid only for object files.
+    | IMAGE_SCN_ALIGN_256BYTES = 0x900000 // Align data on a 256-byte boundary. Valid only for object files.
+    | IMAGE_SCN_ALIGN_512BYTES = 0xA00000 // Align data on a 512-byte boundary. Valid only for object files.
+    | IMAGE_SCN_ALIGN_1024BYTES = 0xB00000 // Align data on a 1024-byte boundary. Valid only for object files.
+    | IMAGE_SCN_ALIGN_2048BYTES = 0xC00000 // Align data on a 2048-byte boundary. Valid only for object files.
+    | IMAGE_SCN_ALIGN_4096BYTES = 0xD00000 // Align data on a 4096-byte boundary. Valid only for object files.
+    | IMAGE_SCN_ALIGN_8192BYTES = 0xE00000 // Align data on a 8192-byte boundary. Valid only for object files.
+    | IMAGE_SCN_LNK_NRELOC_OVFL = 0x1000000 // The section contains extended relocations.
+    | IMAGE_SCN_MEM_DISCARDABLE = 0x2000000 // The section can be discarded as needed.
+    | IMAGE_SCN_MEM_NOT_CACHED = 0x4000000 // The section cannot be cached.
+    | IMAGE_SCN_MEM_NOT_PAGED = 0x8000000 // The section is not pageable.
+    | IMAGE_SCN_MEM_SHARED = 0x10000000 // The section can be shared in memory.
+    | IMAGE_SCN_MEM_EXECUTE = 0x20000000 // The section can be executed as code.
+    | IMAGE_SCN_MEM_READ = 0x40000000 // The section can be read.
+    | IMAGE_SCN_MEM_WRITE = 0x80000000 // The section can be written to.
+
     type SectionHeader =
         {
             SectionName: string
@@ -108,7 +153,7 @@ module PeCoffAllocateTypes =
             PointerToLineNumbers: uint32
             NumberOfRelocations: uint16
             NumberOfLineNumbers: uint16
-            SectionCharacteristics: uint32
+            SectionCharacteristics: SectionCharacteristics
         }
 
     type Region =
@@ -176,7 +221,6 @@ module PeCoffAllocate =
         let numSections = List.length sections
 
         let fileOffset = 0
-        let virtualAddress = 0
 
         let mzHeaderRegion = { offset = fileOffset; size = 0x40 }
         let fileOffset = calcEnd mzHeaderRegion
@@ -195,21 +239,25 @@ module PeCoffAllocate =
 
         let sectionTableRegion = { offset = fileOffset; size = 40 * numSections }
         let fileOffset = calcEnd sectionTableRegion
+        let virtualAddress = fileOffset
+        let headerSize = fileOffset
 
         let allocatedSections, fileOffset, virtualAddress = allocateSections fileOffset virtualAddress sections
 
         let fileSize = fileOffset
+        let virtualImageSize = virtualAddress
 
         let header =
             {
                 NumberOfSections = uint16 numSections
                 TimeDateStamp = 0u
                 SizeOfOptionalHeader = uint16 (optionalHeaderRegion.size + dataDirectoryRegion.size)
-                Characteristics = Characteristics.IMAGE_FILE_RELOCS_STRIPPED
-                                  ||| Characteristics.IMAGE_FILE_EXECUTABLE_IMAGE
-                                  ||| Characteristics.IMAGE_FILE_LINE_NUMS_STRIPPED
-                                  ||| Characteristics.IMAGE_FILE_LOCAL_SYMS_STRIPPED
-                                  ||| Characteristics.IMAGE_FILE_32BIT_MACHINE
+                Characteristics = FileCharacteristics.IMAGE_FILE_RELOCS_STRIPPED
+                                  ||| FileCharacteristics.IMAGE_FILE_EXECUTABLE_IMAGE
+                                  ||| FileCharacteristics.IMAGE_FILE_LINE_NUMS_STRIPPED
+                                  ||| FileCharacteristics.IMAGE_FILE_LOCAL_SYMS_STRIPPED
+                                  ||| FileCharacteristics.IMAGE_FILE_DEBUG_STRIPPED
+                                  ||| FileCharacteristics.IMAGE_FILE_32BIT_MACHINE
                 MajorLinkerVersion = 0uy
                 MinorLinkerVersion = 0uy
                 SizeOfCode = 0u
@@ -218,27 +266,27 @@ module PeCoffAllocate =
                 AddressOfEntryPoint = 0u
                 BaseOfCode = 0u
                 BaseOfData = 0u
-                ImageBase = 0u
-                SectionAlignment = 0u
-                FileAlignment = 0u
-                MajorOperatingSystemVersion = 0us
+                ImageBase = 0x400000u
+                SectionAlignment = 1u <<< sectionAlignmentBits
+                FileAlignment = 1u <<< fileAlignmentBits
+                MajorOperatingSystemVersion = 10us // Windows 10
                 MinorOperatingSystemVersion = 0us
                 MajorImageVersion = 0us
                 MinorImageVersion = 0us
                 MajorSubsystemVersion = 0us
                 MinorSubsystemVersion = 0us
                 Win32VersionValue = 0u
-                SizeOfImage = 0u
-                SizeOfHeaders = 0u
+                SizeOfImage = uint virtualImageSize
+                SizeOfHeaders = uint (align fileAlignmentBits headerSize)
                 CheckSum = 0u
-                Subsystem = 0us
+                Subsystem = Subsystem.IMAGE_SUBSYSTEM_WINDOWS_CUI
                 DllCharacteristics = 0us
                 SizeOfStackReserve = 0u
                 SizeOfStackCommit = 0u
                 SizeOfHeapReserve = 0u
                 SizeOfHeapCommit = 0u
                 LoaderFlags = 0u
-                NumberOfRvaAndSizes = 0u
+                NumberOfRvaAndSizes = 16u
             }
 
         let dataDirectory =
@@ -261,19 +309,21 @@ module PeCoffAllocate =
                 Reserved = { VirtualAddress = 0u; Size = 0u }
             }
 
-        let sectionsTable = [
+        let sectionHeader (section: AllocatedSection) =
             {
                 SectionName = "qwe"
-                VirtualSize = 0u
-                VirtualAddress = 0u
-                SizeOfRawData = 0u
-                PointerToRawData = 0u
+                VirtualSize = uint section.virtualRegion.size
+                VirtualAddress = uint section.virtualRegion.offset
+                SizeOfRawData = uint section.fileRegion.size
+                PointerToRawData = if section.fileRegion.size > 0 then uint section.fileRegion.offset else 0u
                 PointerToRelocations = 0u
                 PointerToLineNumbers = 0u
                 NumberOfRelocations = 0us
                 NumberOfLineNumbers = 0us
-                SectionCharacteristics = 0u
-            } ]
+                SectionCharacteristics = SectionCharacteristics.None
+            }
+
+        let sectionsTable = List.map sectionHeader allocatedSections
 
         {
             header = header
@@ -332,12 +382,7 @@ module PeCoffWrite =
         writeUint32 image (offset + 8) 0u // PointerToSymbolTable
         writeUint32 image (offset + 12) 0u // NumberOfSymbols
         writeUint16 image (offset + 16) header.SizeOfOptionalHeader
-        let characteristics = Characteristics.IMAGE_FILE_RELOCS_STRIPPED
-                              ||| Characteristics.IMAGE_FILE_EXECUTABLE_IMAGE
-                              ||| Characteristics.IMAGE_FILE_LINE_NUMS_STRIPPED
-                              ||| Characteristics.IMAGE_FILE_LOCAL_SYMS_STRIPPED
-                              ||| Characteristics.IMAGE_FILE_32BIT_MACHINE
-        writeUint16 image (offset + 18) (uint16 characteristics)
+        writeUint16 image (offset + 18) (uint16 header.Characteristics)
 
     let writeOptionalHeader (image: byte array) (region: Region) (header: Header) =
         let offset = region.offset
@@ -363,7 +408,7 @@ module PeCoffWrite =
         writeUint32 image (offset + 56) header.SizeOfImage
         writeUint32 image (offset + 60) header.SizeOfHeaders
         writeUint32 image (offset + 64) header.CheckSum
-        writeUint16 image (offset + 68) header.Subsystem
+        writeUint16 image (offset + 68) (uint16 header.Subsystem)
         writeUint16 image (offset + 70) header.DllCharacteristics
         writeUint32 image (offset + 72) header.SizeOfStackReserve
         writeUint32 image (offset + 76) header.SizeOfStackCommit
@@ -407,16 +452,16 @@ module PeCoffWrite =
         writeUint32 image (offset + 28) sectionHeader.PointerToLineNumbers
         writeUint16 image (offset + 32) sectionHeader.NumberOfRelocations
         writeUint16 image (offset + 34) sectionHeader.NumberOfLineNumbers
-        writeUint32 image (offset + 36) sectionHeader.SectionCharacteristics
+        writeUint32 image (offset + 36) (uint sectionHeader.SectionCharacteristics)
 
     let writeSectionsTable (image: byte array) (region: Region) (headers: SectionHeader list) =
-        List.fold (fun offset header -> writeSectionHeader image offset header; offset + 40) region.offset headers |> ignore
+        List.iteri (fun i header -> writeSectionHeader image (region.offset + i * 40) header) headers
 
     let writeSection (image: byte array) (section: AllocatedSection) =
         Array.Copy(section.section.contents, 0, image, section.fileRegion.offset, section.section.contents.Length)
 
     let writeSections (image: byte array) (sections: AllocatedSection list) =
-        List.map (writeSection image) sections |> ignore
+        List.iter (writeSection image) sections
 
     let getContents (peCoffInfo: PeCoffInfo): byte array =
 
