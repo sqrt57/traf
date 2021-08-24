@@ -1,6 +1,5 @@
 namespace Triton
 
-[<RequireQualifiedAccess>]
 module Cst =
 
     type Expr =

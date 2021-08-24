@@ -1,22 +1,21 @@
 namespace Triton
 
-
-[<RequireQualifiedAccess>]
 module Ast =
 
-    type ConstExpr =
+    type ConstExpr<'a> =
         | IntVal of int64
         | CharVal of char
         | BoolVal of bool
         | StringVal of string
         | Ref of string
         | Null
-        | Length of ConstExpr
-        | SizeOf of ConstExpr
-        | AddressOf of ConstExpr
-        | Negate of ConstExpr
-        | Operator of ConstOperatorCall
-    and ConstOperatorCall = { left: ConstExpr; op: string; right: ConstExpr; }
+        | Length of ConstExprAttr<'a>
+        | SizeOf of ConstExprAttr<'a>
+        | AddressOf of ConstExprAttr<'a>
+        | Negate of ConstExprAttr<'a>
+        | Operator of ConstOperatorCall<'a>
+    and ConstOperatorCall<'a> = { left: ConstExprAttr<'a>; op: string; right: ConstExprAttr<'a>; }
+    and ConstExprAttr<'a> = ConstExprAttr of ConstExpr<'a> * 'a
 
     type Expr =
         | IntVal of int64
@@ -77,17 +76,17 @@ module Ast =
           type_: FunType
           attrs: ExternFunAttrs }
 
-    type ModuleItem =
-        | ConstDefinition of ConstDefinition<ConstExpr>
-        | VarDefinition of VarDefinition<ConstExpr>
+    type ModuleItem<'a> =
+        | ConstDefinition of ConstDefinition<ConstExprAttr<'a>>
+        | VarDefinition of VarDefinition<ConstExprAttr<'a>>
         | FunDefinition of FunDefinition
         | ExternFunDefinition of ExternFunDefinition
 
-    type ModuleTopLevel = ModuleTopLevel of ModuleItem list
+    type ModuleTopLevel<'a> = ModuleTopLevel of ModuleItem<'a> list
 
-    type Module = { name: string; definitions: ModuleTopLevel }
+    type Module<'a> = { name: string; definitions: ModuleTopLevel<'a> }
 
-    type TopLevel = TopLevel of Module list
+    type TopLevel<'a> = TopLevel of Module<'a> list
 
 
 module AstConvert =
@@ -96,26 +95,27 @@ module AstConvert =
 
     let rec private toConstExpr expr =
         match expr with
-        | Cst.IntVal i -> Ast.ConstExpr.IntVal i
-        | Cst.CharVal c -> Ast.ConstExpr.CharVal c
-        | Cst.BoolVal b -> Ast.ConstExpr.BoolVal b
-        | Cst.StringVal s -> Ast.ConstExpr.StringVal s
-        | Cst.Ref r -> Ast.ConstExpr.Ref r
-        | Cst.Null -> Ast.ConstExpr.Null
-        | Cst.AddressOf expr -> Ast.ConstExpr.AddressOf (toConstExpr expr)
-        | Cst.Negate expr -> Ast.ConstExpr.Negate (toConstExpr expr)
+        | Cst.IntVal i -> Ast.ConstExprAttr (Ast.ConstExpr.IntVal i, ())
+        | Cst.CharVal c -> Ast.ConstExprAttr (Ast.ConstExpr.CharVal c, ())
+        | Cst.BoolVal b -> Ast.ConstExprAttr (Ast.ConstExpr.BoolVal b, ())
+        | Cst.StringVal s -> Ast.ConstExprAttr (Ast.ConstExpr.StringVal s, ())
+        | Cst.Ref r -> Ast.ConstExprAttr (Ast.ConstExpr.Ref r, ())
+        | Cst.Null -> Ast.ConstExprAttr (Ast.ConstExpr.Null, ())
+        | Cst.AddressOf expr -> Ast.ConstExprAttr (Ast.ConstExpr.AddressOf (toConstExpr expr), ())
+        | Cst.Negate (Cst.IntVal i) -> Ast.ConstExprAttr (Ast.ConstExpr.IntVal (-i), ())
+        | Cst.Negate expr -> Ast.ConstExprAttr (Ast.ConstExpr.Negate (toConstExpr expr), ())
         | Cst.FunCall { func = Cst.Ref "length"; arguments = [arg] } ->
-            Ast.ConstExpr.Length (toConstExpr arg)
+            Ast.ConstExprAttr (Ast.ConstExpr.Length (toConstExpr arg), ())
         | Cst.FunCall { func = Cst.Ref "length"; arguments = _ } ->
             raise (AstConvertError {| message = "length() accepts exactly one argument" |})
         | Cst.FunCall { func = Cst.Ref "sizeof"; arguments = [arg] } ->
-            Ast.ConstExpr.SizeOf (toConstExpr arg)
+            Ast.ConstExprAttr (Ast.ConstExpr.SizeOf (toConstExpr arg), ())
         | Cst.FunCall { func = Cst.Ref "sizeof"; arguments = _ } ->
             raise (AstConvertError {| message = "sizeof() accepts exactly one argument" |})
         | Cst.FunCall { func = _; arguments = _ } ->
             raise (AstConvertError {| message = "function call is illegal in constant expression" |})
         | Cst.Operator { left = left; op = op; right = right } ->
-            Ast.ConstExpr.Operator { left = toConstExpr left; op = op; right = toConstExpr right }
+            Ast.ConstExprAttr (Ast.ConstExpr.Operator { left = toConstExpr left; op = op; right = toConstExpr right }, ())
 
     let rec private toExpr expr =
         match expr with
@@ -230,10 +230,11 @@ module AstConvert =
         | Cst.FunDefinition f -> Ast.FunDefinition (toFun f)
         | Cst.ExternFunDefinition ef -> Ast.ExternFunDefinition (toExternFun ef)
 
-    let private module_ ({ name = name; definitions = Cst.ModuleTopLevel definitions; } : Cst.Module) : Ast.Module =
-        { name = name
+    let private module_ (cstModule: Cst.Module) : Ast.Module<unit> =
+        let (Cst.ModuleTopLevel definitions) = cstModule.definitions
+        { name = cstModule.name
           definitions = Ast.ModuleTopLevel <| List.map toModuleItem definitions }
 
     let private topLevel (Cst.TopLevel modules) = Ast.TopLevel <| List.map module_ modules
 
-    let convert (cst: Cst.TopLevel) : Ast.TopLevel = topLevel cst
+    let convert (cst: Cst.TopLevel) : Ast.TopLevel<unit> = topLevel cst

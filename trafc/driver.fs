@@ -14,8 +14,9 @@ module Driver =
         { inputs: string list
           exeOutput: string option
           lexerOutput: string option
-          cstParserOutput: string option
-          astParserOutput: string option
+          cstOutput: string option
+          astOutput: string option
+          astWithTypesOutput: string option
           verbose: Verbosity }
 
     type CompiledModule =
@@ -23,7 +24,8 @@ module Driver =
           contents: string
           lexemes: Lexeme list
           cst: Cst.TopLevel
-          ast: Ast.TopLevel }
+          ast: Ast.TopLevel<unit>
+          astWithTypes: Ast.TopLevel<Types.LangType> }
 
     let compileModule fileName =
 
@@ -31,12 +33,14 @@ module Driver =
         let lexemes = Lexer.lex contents |> List.ofSeq
         let cst = CstParser.parse lexemes
         let ast = AstConvert.convert cst
+        let astWithTypes = MarkTypes.markTypes ast
 
         { fileName = fileName
           contents = contents
           lexemes = lexemes
           cst = cst
-          ast = ast }
+          ast = ast
+          astWithTypes = astWithTypes }
 
     let writeLexerOutput (fileName: string) (modules: CompiledModule seq) =
         use writer = new StreamWriter(fileName)
@@ -60,6 +64,13 @@ module Driver =
             fprintfn writer "%A" m.ast
             fprintfn writer ""
 
+    let writeAstWithTypesOutput (fileName: string) (modules: CompiledModule seq) =
+        use writer = new StreamWriter(fileName)
+        for m in modules do
+            fprintfn writer "Mark types result for %s:" fileName
+            fprintfn writer "%A" m.astWithTypes
+            fprintfn writer ""
+
     let runCompiler (config: Config) =
         let modules = List.map compileModule config.inputs
 
@@ -67,12 +78,16 @@ module Driver =
         | Some fileName -> writeLexerOutput fileName modules
         | _ -> ()
 
-        match config.cstParserOutput with
+        match config.cstOutput with
         | Some fileName -> writeCstOutput fileName modules
         | _ -> ()
 
-        match config.astParserOutput with
+        match config.astOutput with
         | Some fileName -> writeAstOutput fileName modules
+        | _ -> ()
+
+        match config.astWithTypesOutput with
+        | Some fileName -> writeAstWithTypesOutput fileName modules
         | _ -> ()
 
         match config.exeOutput with

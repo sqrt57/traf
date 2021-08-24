@@ -10,11 +10,12 @@ let parseCmdLine (argv : string list) : Driver.Config =
         inputs = []
         exeOutput = None
         lexerOutput = None
-        cstParserOutput = None
-        astParserOutput = None
+        cstOutput = None
+        astOutput = None
+        astWithTypesOutput = None
         verbose = Driver.Verbosity.Normal }
 
-    let rec parse (argv : string list) (config : Driver.Config) =
+    let rec parse (argv: string list) (config: Driver.Config) =
         match argv with
         | [] -> { config with inputs = List.rev config.inputs }
         | "-o" :: rest ->
@@ -35,16 +36,23 @@ let parseCmdLine (argv : string list) : Driver.Config =
             match rest with
             | [] -> raise (CommandLineParserError "CST output file name expected after '--cst'")
             | fileName :: rest -> 
-                match config.cstParserOutput with
+                match config.cstOutput with
                 | Some _ -> raise (CommandLineParserError "multiple CST output files specified")
-                | None ->  parse rest { config with cstParserOutput = Some fileName }
+                | None ->  parse rest { config with cstOutput = Some fileName }
         | "--ast" :: rest ->
             match rest with
             | [] -> raise (CommandLineParserError "AST output file name expected after '--ast'")
             | fileName :: rest -> 
-                match config.astParserOutput with
+                match config.astOutput with
                 | Some _ -> raise (CommandLineParserError "multiple AST output files specified")
-                | None ->  parse rest { config with astParserOutput = Some fileName }
+                | None ->  parse rest { config with astOutput = Some fileName }
+        | "--ast-types" :: rest ->
+            match rest with
+            | [] -> raise (CommandLineParserError "AST with types output file name expected after '--ast-types'")
+            | fileName :: rest -> 
+                match config.astWithTypesOutput with
+                | Some _ -> raise (CommandLineParserError "multiple AST with types output files specified")
+                | None ->  parse rest { config with astWithTypesOutput = Some fileName }
         | x :: _ when x.StartsWith("-") -> raise (CommandLineParserError <| sprintf "unknown option '%s'" x)
         | fileName :: rest -> parse rest { config with inputs = fileName :: config.inputs }
 
@@ -84,4 +92,7 @@ let main argv =
             1
         | AstConvert.AstConvertError err ->
             eprintfn "Error while converting CST to AST: %s" err.message
+            1
+        | MarkTypes.TypeError err ->
+            eprintfn "Error while marking types: %s" err.message
             1
