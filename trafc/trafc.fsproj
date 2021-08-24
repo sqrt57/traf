@@ -15,6 +15,7 @@
     <Compile Include="Lex.fs" />
     <Compile Include="CstParse.fs" />
     <Compile Include="AstConvert.fs" />
+    <Compile Include="AstTransform.fs" />
     <Compile Include="MarkTypes.fs" />
     <Compile Include="PeCoffOutput.fs" />
     <Compile Include="Drive.fs" />

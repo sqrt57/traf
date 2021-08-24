@@ -3,43 +3,23 @@ namespace Triton
 module MarkTypes =
 
     open Error
-    open Ast
+    open AstTransformer
     open LangType
 
-    let rec private constExpr (ConstExprAttr (expr, _)) =
-        match expr with
-        | ConstExpr.IntVal i -> ConstExprAttr (ConstExpr.IntVal i, Int)
-        | ConstExpr.CharVal c -> ConstExprAttr (ConstExpr.CharVal c, Char)
-        | ConstExpr.BoolVal b -> ConstExprAttr (ConstExpr.BoolVal b, Bool)
-        | ConstExpr.StringVal s -> ConstExprAttr (ConstExpr.StringVal s, String)
-        | ConstExpr.Ref r -> ConstExprAttr (ConstExpr.Ref r, None)
-        | ConstExpr.Null -> ConstExprAttr (ConstExpr.Null, Pointer)
-        | ConstExpr.AddressOf exprAttr -> ConstExprAttr (ConstExpr.AddressOf (constExpr exprAttr), Pointer)
-        | ConstExpr.Negate exprAttr ->
-            let exprAttr = constExpr exprAttr
-            let (ConstExprAttr (_, t)) = exprAttr
-            match t with
-            | Int -> ConstExprAttr (ConstExpr.Negate exprAttr, Int)
-            | _ -> raise (TypeError {| message = "Unary negation can be only applied to integers" |})
-        | ConstExpr.Length expr -> ConstExprAttr (ConstExpr.Length (constExpr expr), Int)
-        | ConstExpr.SizeOf expr -> ConstExprAttr (ConstExpr.SizeOf (constExpr expr), Int)
-        | ConstExpr.Operator { left = left; op = op; right = right } ->
-            ConstExprAttr (ConstExpr.Operator { left = constExpr left; op = op; right = constExpr right }, None)
-
-    let private toModuleItem moduleItem =
-        match moduleItem with
-        | ConstDefinition { name = name; type_ = type_; value = value } ->
-            ConstDefinition { name = name; type_ = type_; value = constExpr value }
-        | VarDefinition { name = name; type_ = type_; value = value } ->
-            VarDefinition { name = name; type_ = type_; value = Option.map constExpr value }
-        | FunDefinition f -> FunDefinition f
-        | ExternFunDefinition ef -> ExternFunDefinition ef
-
-    let private module_ cstModule =
-        let (ModuleTopLevel definitions) = cstModule.definitions
-        { name = cstModule.name
-          definitions = ModuleTopLevel <| List.map toModuleItem definitions }
-
-    let private topLevel (TopLevel modules) = TopLevel <| List.map module_ modules
-
-    let markTypes (ast: TopLevel<unit>) : TopLevel<Type> = topLevel ast
+    let markTypes =
+        { new ISynthesizedAttribute<unit, Type> with
+            member this.intVal value source = Int
+            member this.charVal value source = Char
+            member this.boolVal value source = Bool
+            member this.stringVal value source = String
+            member this.reference value source = None
+            member this.null_ source = Pointer
+            member this.length arg source = None
+            member this.sizeOf arg source = None
+            member this.addressOf arg source = None
+            member this.negate arg source =
+                match arg with
+                | Int -> Int
+                | _ -> raise (TypeError {| message = "Unary negation can be only applied to integers" |})
+            member this.operator left op right source = None
+        }

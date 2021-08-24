@@ -2,20 +2,20 @@ namespace Triton
 
 module Ast =
 
-    type ConstExpr<'a> =
+    type ConstExpr<'typ> =
         | IntVal of int64
         | CharVal of char
         | BoolVal of bool
         | StringVal of string
         | Ref of string
         | Null
-        | Length of ConstExprAttr<'a>
-        | SizeOf of ConstExprAttr<'a>
-        | AddressOf of ConstExprAttr<'a>
-        | Negate of ConstExprAttr<'a>
-        | Operator of ConstOperatorCall<'a>
-    and ConstOperatorCall<'a> = { left: ConstExprAttr<'a>; op: string; right: ConstExprAttr<'a>; }
-    and ConstExprAttr<'a> = ConstExprAttr of ConstExpr<'a> * 'a
+        | Length of ConstExprAttr<'typ>
+        | SizeOf of ConstExprAttr<'typ>
+        | AddressOf of ConstExprAttr<'typ>
+        | Negate of ConstExprAttr<'typ>
+        | Operator of ConstOperatorCall<'typ>
+    and ConstOperatorCall<'typ> = { left: ConstExprAttr<'typ>; op: string; right: ConstExprAttr<'typ>; }
+    and ConstExprAttr<'typ> = ConstExprAttr of ConstExpr<'typ> * 'typ
 
     type Expr =
         | IntVal of int64
@@ -76,14 +76,29 @@ module Ast =
           type_: FunType
           attrs: ExternFunAttrs }
 
-    type ModuleItem<'a> =
-        | ConstDefinition of ConstDefinition<ConstExprAttr<'a>>
-        | VarDefinition of VarDefinition<ConstExprAttr<'a>>
+    type ModuleItem<'typ> =
+        | ConstDefinition of ConstDefinition<ConstExprAttr<'typ>>
+        | VarDefinition of VarDefinition<ConstExprAttr<'typ>>
         | FunDefinition of FunDefinition
         | ExternFunDefinition of ExternFunDefinition
 
-    type ModuleTopLevel<'a> = ModuleTopLevel of ModuleItem<'a> list
+    type ModuleTopLevel<'typ> = ModuleTopLevel of ModuleItem<'typ> list
 
-    type Module<'a> = { name: string; definitions: ModuleTopLevel<'a> }
+    type Module<'typ> = { name: string; definitions: ModuleTopLevel<'typ> }
 
-    type TopLevel<'a> = TopLevel of Module<'a> list
+    type TopLevel<'typ> = TopLevel of Module<'typ> list
+
+module AstTransformer =
+
+    type ISynthesizedAttribute<'source, 'target> =
+        abstract member intVal: value: int64 -> source: 'source -> 'target
+        abstract member charVal: value: char -> source: 'source -> 'target
+        abstract member boolVal: value: bool -> source: 'source -> 'target
+        abstract member stringVal: value: string -> source: 'source -> 'target
+        abstract member reference: value: string -> source: 'source -> 'target
+        abstract member null_: source: 'source -> 'target
+        abstract member length: arg: 'target -> source: 'source -> 'target
+        abstract member sizeOf: arg: 'target -> source: 'source -> 'target
+        abstract member addressOf: arg: 'target -> source: 'source -> 'target
+        abstract member negate: arg: 'target -> source: 'source -> 'target
+        abstract member operator: left: 'target -> op: string -> right: 'target -> source: 'source -> 'target

@@ -31,7 +31,7 @@ module Drive =
         let lexemes = Lex.lex contents |> List.ofSeq
         let cst = CstParse.parse lexemes
         let ast = AstConvert.convert cst
-        let astWithTypes = MarkTypes.markTypes ast
+        let astWithTypes = AstTransform.synthesizeAttr MarkTypes.markTypes ast
 
         { fileName = fileName
           contents = contents
