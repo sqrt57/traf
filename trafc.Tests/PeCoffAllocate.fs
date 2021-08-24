@@ -1,4 +1,4 @@
-module Triton.Tests.PeCoffTests
+module Triton.Tests.PeCoffAllocateTests
 
 open Xunit
 open Swensen.Unquote

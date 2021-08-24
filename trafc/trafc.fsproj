@@ -6,12 +6,18 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Include="lexer.fs" />
-    <Compile Include="CstParser.fs" />
+    <Compile Include="Lexeme.fs" />
+    <Compile Include="Cst.fs" />
+    <Compile Include="Ast.fs" />
+    <Compile Include="LangType.fs" />
+    <Compile Include="PeCoff.fs" />
+    <Compile Include="Error.fs" />
+    <Compile Include="Lex.fs" />
+    <Compile Include="CstParse.fs" />
     <Compile Include="AstConvert.fs" />
     <Compile Include="MarkTypes.fs" />
-    <Compile Include="PeCoff.fs" />
-    <Compile Include="driver.fs" />
+    <Compile Include="PeCoffOutput.fs" />
+    <Compile Include="Drive.fs" />
     <Compile Include="trafc.fs" />
   </ItemGroup>
 

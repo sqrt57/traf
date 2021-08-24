@@ -1,10 +1,8 @@
 namespace Triton
 
-open System.IO
+module Drive =
 
-module Driver =
-
-    exception DriverError of {| message: string |}
+    open System.IO
 
     type Verbosity =
         | Silent
@@ -22,16 +20,16 @@ module Driver =
     type CompiledModule =
         { fileName: string
           contents: string
-          lexemes: Lexeme list
+          lexemes: Lexeme.Lexeme list
           cst: Cst.TopLevel
           ast: Ast.TopLevel<unit>
-          astWithTypes: Ast.TopLevel<Types.LangType> }
+          astWithTypes: Ast.TopLevel<LangType.Type> }
 
     let compileModule fileName =
 
         let contents = File.ReadAllText fileName
-        let lexemes = Lexer.lex contents |> List.ofSeq
-        let cst = CstParser.parse lexemes
+        let lexemes = Lex.lex contents |> List.ofSeq
+        let cst = CstParse.parse lexemes
         let ast = AstConvert.convert cst
         let astWithTypes = MarkTypes.markTypes ast
 
@@ -91,5 +89,5 @@ module Driver =
         | _ -> ()
 
         match config.exeOutput with
-        | Some exeName -> PeCoff.writeExe exeName
+        | Some exeName -> PeCoffOutput.writeExe exeName
         | None -> ()

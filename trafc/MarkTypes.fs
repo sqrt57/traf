@@ -1,21 +1,10 @@
 namespace Triton
 
-module Types =
-
-    type LangType =
-        | None
-        | Bool
-        | Int
-        | Char
-        | String
-        | Pointer
-
 module MarkTypes =
 
-    exception TypeError of {| message: string |}
-
+    open Error
     open Ast
-    open Types
+    open LangType
 
     let rec private constExpr (ConstExprAttr (expr, _)) =
         match expr with
@@ -53,4 +42,4 @@ module MarkTypes =
 
     let private topLevel (TopLevel modules) = TopLevel <| List.map module_ modules
 
-    let markTypes (ast: TopLevel<unit>) : TopLevel<LangType> = topLevel ast
+    let markTypes (ast: TopLevel<unit>) : TopLevel<Type> = topLevel ast

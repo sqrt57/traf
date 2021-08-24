@@ -1,46 +1,50 @@
-module Triton.Tests.CstParserTests
+module Triton.Tests.CstParseTests
 
 open Xunit
 open Swensen.Unquote
 
 open Triton
+open Triton.Parse
+open Triton.CstParse
 
 [<Fact>]
 let ``Top level: empty source`` () =
-    test <@ Cst.TopLevel [] = CstParser.parse []  @>
+    test <@ Cst.TopLevel [] = parse []  @>
 
 [<Fact>]
 let ``Top level: empty module`` () =
     let expected = Cst.TopLevel [ { name = "X"; definitions = Cst.ModuleTopLevel [] } ]
-    let actual = CstParser.parse [ Lexeme.Identifier "module"
-                                   Lexeme.Identifier "X"
-                                   Lexeme.LeftCurly
-                                   Lexeme.RightCurly ]
+    let actual = parse [
+        Lexeme.Identifier "module"
+        Lexeme.Identifier "X"
+        Lexeme.LeftCurly
+        Lexeme.RightCurly ]
     test <@ expected = actual @>
 
 [<Fact>]
 let ``Top level: two empty modules`` () =
     let expected = Cst.TopLevel [ { name = "X"; definitions = Cst.ModuleTopLevel [] }
                                   { name = "Y"; definitions = Cst.ModuleTopLevel [] } ]
-    let actual = CstParser.parse [ Lexeme.Identifier "module"
-                                   Lexeme.Identifier "X"
-                                   Lexeme.LeftCurly
-                                   Lexeme.RightCurly
-                                   Lexeme.Identifier "module"
-                                   Lexeme.Identifier "Y"
-                                   Lexeme.LeftCurly
-                                   Lexeme.RightCurly ]
+    let actual = parse [
+        Lexeme.Identifier "module"
+        Lexeme.Identifier "X"
+        Lexeme.LeftCurly
+        Lexeme.RightCurly
+        Lexeme.Identifier "module"
+        Lexeme.Identifier "Y"
+        Lexeme.LeftCurly
+        Lexeme.RightCurly ]
     test <@ expected = actual @>
 
 [<Fact>]
 let ``Module: do not parse closing bracket`` () =
-    let actual = CstParser.ParseModule.moduleBodyItem [ Lexeme.RightCurly ]
-    test <@ ParserHelper.NoMatch = actual @>
+    let actual = ParseModule.moduleBodyItem [ Lexeme.RightCurly ]
+    test <@ NoMatch = actual @>
 
 [<Fact>]
 let ``Module: const definition with simple type`` () =
     let expected = Cst.ConstDefinition { name = "C"; type_ = Cst.TypeRef "int32"; value = Cst.IntVal 15L }
-    let actual = CstParser.ParseModule.moduleBodyItem [
+    let actual = ParseModule.moduleBodyItem [
         Lexeme.Identifier "const"
         Lexeme.Identifier "C"
         Lexeme.Operator ":"
@@ -48,7 +52,7 @@ let ``Module: const definition with simple type`` () =
         Lexeme.Operator ":="
         Lexeme.Int 15L
         Lexeme.Semicolon ]
-    test <@ ParserHelper.Match ([], expected) = actual @>
+    test <@ Match ([], expected) = actual @>
 
 [<Fact>]
 let ``Module: const definition with pointer type`` () =
@@ -57,7 +61,7 @@ let ``Module: const definition with pointer type`` () =
             { name = "C"
               type_ = Cst.Pointer <| Cst.TypeRef "int32"
               value = Cst.IntVal 15L }
-    let actual = CstParser.ParseModule.moduleBodyItem [
+    let actual = ParseModule.moduleBodyItem [
         Lexeme.Identifier "const"
         Lexeme.Identifier "C"
         Lexeme.Operator ":"
@@ -66,7 +70,7 @@ let ``Module: const definition with pointer type`` () =
         Lexeme.Operator ":="
         Lexeme.Int 15L
         Lexeme.Semicolon ]
-    test <@ ParserHelper.Match ([], expected) = actual @>
+    test <@ Match ([], expected) = actual @>
 
 [<Fact>]
 let ``Module: const definition with sized array type`` () =
@@ -75,7 +79,7 @@ let ``Module: const definition with sized array type`` () =
             { name = "C"
               type_ = Cst.Array { type_ = Cst.TypeRef "int32"; size = Some <| Cst.IntVal 20L; }
               value = Cst.IntVal 15L }
-    let actual = CstParser.ParseModule.moduleBodyItem [
+    let actual = ParseModule.moduleBodyItem [
         Lexeme.Identifier "const"
         Lexeme.Identifier "C"
         Lexeme.Operator ":"
@@ -86,7 +90,7 @@ let ``Module: const definition with sized array type`` () =
         Lexeme.Operator ":="
         Lexeme.Int 15L
         Lexeme.Semicolon ]
-    test <@ ParserHelper.Match ([], expected) = actual @>
+    test <@ Match ([], expected) = actual @>
 
 [<Fact>]
 let ``Module: const definition with unsized array type`` () =
@@ -95,7 +99,7 @@ let ``Module: const definition with unsized array type`` () =
             { name = "C"
               type_ = Cst.Array { type_ = Cst.TypeRef "int32"; size = None; }
               value = Cst.IntVal 15L }
-    let actual = CstParser.ParseModule.moduleBodyItem [
+    let actual = ParseModule.moduleBodyItem [
         Lexeme.Identifier "const"
         Lexeme.Identifier "C"
         Lexeme.Operator ":"
@@ -105,7 +109,7 @@ let ``Module: const definition with unsized array type`` () =
         Lexeme.Operator ":="
         Lexeme.Int 15L
         Lexeme.Semicolon ]
-    test <@ ParserHelper.Match ([], expected) = actual @>
+    test <@ Match ([], expected) = actual @>
 
 [<Fact>]
 let ``Module: const definition simple type with brackets`` () =
@@ -114,7 +118,7 @@ let ``Module: const definition simple type with brackets`` () =
             { name = "C"
               type_ = Cst.Type.Tuple <| Cst.TypeTuple [ { name = None; type_ = Cst.TypeRef "int32" } ]
               value = Cst.IntVal 15L }
-    let actual = CstParser.ParseModule.moduleBodyItem [
+    let actual = ParseModule.moduleBodyItem [
         Lexeme.Identifier "const"
         Lexeme.Identifier "C"
         Lexeme.Operator ":"
@@ -124,7 +128,7 @@ let ``Module: const definition simple type with brackets`` () =
         Lexeme.Operator ":="
         Lexeme.Int 15L
         Lexeme.Semicolon ]
-    test <@ ParserHelper.Match ([], expected) = actual @>
+    test <@ Match ([], expected) = actual @>
 
 [<Fact>]
 let ``Module: function definition`` () =
@@ -134,7 +138,7 @@ let ``Module: function definition`` () =
               type_ = { arguments = Cst.TypeTuple []; result = Cst.TypeTuple [] }
               body = Cst.FunBody []
               attributes = Cst.AttrLists [] }
-    let actual = CstParser.ParseModule.moduleBodyItem [
+    let actual = ParseModule.moduleBodyItem [
         Lexeme.Identifier "fun"
         Lexeme.Identifier "F"
         Lexeme.Operator ":"
@@ -145,7 +149,7 @@ let ``Module: function definition`` () =
         Lexeme.RightBracket
         Lexeme.LeftCurly
         Lexeme.RightCurly ]
-    test <@ ParserHelper.Match ([], expected) = actual @>
+    test <@ Match ([], expected) = actual @>
 
 [<Fact>]
 let ``Module: function definition with simple types`` () =
@@ -156,7 +160,7 @@ let ``Module: function definition with simple types`` () =
                         result = Cst.TypeTuple [ { name = None; type_ = Cst.TypeRef "int32" } ] }
               body = Cst.FunBody []
               attributes = Cst.AttrLists [] }
-    let actual = CstParser.ParseModule.moduleBodyItem [
+    let actual = ParseModule.moduleBodyItem [
         Lexeme.Identifier "fun"
         Lexeme.Identifier "F"
         Lexeme.Operator ":"
@@ -165,7 +169,7 @@ let ``Module: function definition with simple types`` () =
         Lexeme.Identifier "int32"
         Lexeme.LeftCurly
         Lexeme.RightCurly ]
-    test <@ ParserHelper.Match ([], expected) = actual @>
+    test <@ Match ([], expected) = actual @>
 
 [<Fact>]
 let ``Module: function definition with simple types in brackets`` () =
@@ -176,7 +180,7 @@ let ``Module: function definition with simple types in brackets`` () =
                         result = Cst.TypeTuple [ { name = None; type_ = Cst.TypeRef "int32" } ] }
               body = Cst.FunBody []
               attributes = Cst.AttrLists [] }
-    let actual = CstParser.ParseModule.moduleBodyItem [
+    let actual = ParseModule.moduleBodyItem [
         Lexeme.Identifier "fun"
         Lexeme.Identifier "F"
         Lexeme.Operator ":"
@@ -189,7 +193,7 @@ let ``Module: function definition with simple types in brackets`` () =
         Lexeme.RightBracket
         Lexeme.LeftCurly
         Lexeme.RightCurly ]
-    test <@ ParserHelper.Match ([], expected) = actual @>
+    test <@ Match ([], expected) = actual @>
 
 [<Fact>]
 let ``Module: function definition with complex types`` () =
@@ -203,7 +207,7 @@ let ``Module: function definition with complex types`` () =
               body = Cst.FunBody []
               attributes = Cst.AttrLists [] }
 
-    let actual = CstParser.ParseModule.moduleBodyItem [
+    let actual = ParseModule.moduleBodyItem [
         Lexeme.Identifier "fun"
         Lexeme.Identifier "F"
         Lexeme.Operator ":"
@@ -220,7 +224,7 @@ let ``Module: function definition with complex types`` () =
         Lexeme.RightBracket
         Lexeme.LeftCurly
         Lexeme.RightCurly ]
-    test <@ ParserHelper.Match ([], expected) = actual @>
+    test <@ Match ([], expected) = actual @>
 
 [<Fact>]
 let ``Module: function definition with named parameters`` () =
@@ -233,7 +237,7 @@ let ``Module: function definition with named parameters`` () =
               body = Cst.FunBody []
               attributes = Cst.AttrLists [] }
 
-    let actual = CstParser.ParseModule.moduleBodyItem [
+    let actual = ParseModule.moduleBodyItem [
         Lexeme.Identifier "fun"
         Lexeme.Identifier "F"
         Lexeme.Operator ":"
@@ -251,7 +255,7 @@ let ``Module: function definition with named parameters`` () =
         Lexeme.RightBracket
         Lexeme.LeftCurly
         Lexeme.RightCurly ]
-    test <@ ParserHelper.Match ([], expected) = actual @>
+    test <@ Match ([], expected) = actual @>
 
 [<Fact>]
 let ``Module: external function definition`` () =
@@ -264,7 +268,7 @@ let ``Module: external function definition`` () =
                   Cst.AttrList [ { name = "dll_import"; value = Cst.String "kernel32.dll" }
                                  { name = "entry_point"; value = Cst.Int 5L } ]
                   Cst.AttrList [ { name = "std_call"; value = Cst.None } ] ] }
-    let actual = CstParser.ParseModule.moduleBodyItem [
+    let actual = ParseModule.moduleBodyItem [
         Lexeme.LeftSquare
         Lexeme.Identifier "dll_import"
         Lexeme.Operator "="
@@ -286,105 +290,105 @@ let ``Module: external function definition`` () =
         Lexeme.LeftBracket
         Lexeme.RightBracket
         Lexeme.Semicolon ]
-    test <@ ParserHelper.Match ([], expected) = actual @>
+    test <@ Match ([], expected) = actual @>
 
 [<Fact>]
 let ``Module: fail parsing attributes without function`` () =
-    let actual = CstParser.ParseModule.moduleBodyItem [
+    let actual = ParseModule.moduleBodyItem [
         Lexeme.LeftSquare
         Lexeme.Identifier "dll_import"
         Lexeme.Operator "="
         Lexeme.StringLiteral "kernel32.dll"
         Lexeme.RightSquare ]
     test <@ match actual with
-            | ParserHelper.Match _ -> false
-            | ParserHelper.NoMatch -> false
-            | ParserHelper.Error _ -> true @>
+            | Match _ -> false
+            | NoMatch -> false
+            | Error _ -> true @>
 
 [<Fact>]
 let ``Function body: do not parse closing bracket`` () =
-    let actual = CstParser.ParseModule.funBodyItem [ Lexeme.RightCurly ]
-    test <@ ParserHelper.NoMatch = actual @>
+    let actual = ParseModule.funBodyItem [ Lexeme.RightCurly ]
+    test <@ NoMatch = actual @>
 
 [<Fact>]
 let ``Function body: variable definition`` () =
     let expected = Cst.VarStatement { name = "x"; type_ = Cst.TypeRef "int32"; value = None; }
-    let actual = CstParser.ParseModule.funBodyItem [
+    let actual = ParseModule.funBodyItem [
         Lexeme.Identifier "var"
         Lexeme.Identifier "x"
         Lexeme.Operator ":"
         Lexeme.Identifier "int32"
         Lexeme.Semicolon ]
-    test <@ ParserHelper.Match ([], expected) = actual @>
+    test <@ Match ([], expected) = actual @>
 
 [<Fact>]
 let ``Function body: assignment`` () =
     let expected = Cst.Assignment { name = "x"; value = Cst.IntVal 5L; }
-    let actual = CstParser.ParseModule.funBodyItem [
+    let actual = ParseModule.funBodyItem [
         Lexeme.Identifier "x"
         Lexeme.Operator ":="
         Lexeme.Int 5L
         Lexeme.Semicolon ]
-    test <@ ParserHelper.Match ([], expected) = actual @>
+    test <@ Match ([], expected) = actual @>
 
 [<Fact>]
 let ``Function body: function call`` () =
     let expected = Cst.Expression <| Cst.FunCall { func = Cst.Ref "f"; arguments = []; }
-    let actual = CstParser.ParseModule.funBodyItem [
+    let actual = ParseModule.funBodyItem [
         Lexeme.Identifier "f"
         Lexeme.LeftBracket
         Lexeme.RightBracket
         Lexeme.Semicolon ]
-    test <@ ParserHelper.Match ([], expected) = actual @>
+    test <@ Match ([], expected) = actual @>
 
 [<Fact>]
 let ``Expression: integer constant`` () =
     let expected = Cst.IntVal 10L
-    let actual = CstParser.ParseExpression.tryExpression [
+    let actual = ParseExpression.tryExpression [
         Lexeme.Int 10L ]
-    test <@ ParserHelper.Match ([], expected) = actual @>
+    test <@ Match ([], expected) = actual @>
 
 [<Fact>]
 let ``Expression: negative integer constant`` () =
     let expected = Cst.Negate <| Cst.IntVal 10L
-    let actual = CstParser.ParseExpression.tryExpression [
+    let actual = ParseExpression.tryExpression [
         Lexeme.Operator "-"
         Lexeme.Int 10L ]
-    test <@ ParserHelper.Match ([], expected) = actual @>
+    test <@ Match ([], expected) = actual @>
 
 [<Fact>]
 let ``Expression: string constant`` () =
     let expected = Cst.StringVal "hello"
-    let actual = CstParser.ParseExpression.tryExpression [
+    let actual = ParseExpression.tryExpression [
         Lexeme.StringLiteral "hello" ]
-    test <@ ParserHelper.Match ([], expected) = actual @>
+    test <@ Match ([], expected) = actual @>
 
 [<Fact>]
 let ``Expression: address of variable`` () =
     let expected = Cst.AddressOf <| Cst.Ref "x"
-    let actual = CstParser.ParseExpression.tryExpression [
+    let actual = ParseExpression.tryExpression [
         Lexeme.AtSign
         Lexeme.Identifier "x" ]
-    test <@ ParserHelper.Match ([], expected) = actual @>
+    test <@ Match ([], expected) = actual @>
 
 [<Fact>]
 let ``Expression: double function call`` () =
     let funCall = Cst.FunCall { func = Cst.Ref "f"; arguments = []; }
     let expected = Cst.FunCall { func = funCall; arguments = []; }
-    let actual = CstParser.ParseExpression.tryExpression [
+    let actual = ParseExpression.tryExpression [
         Lexeme.Identifier "f"
         Lexeme.LeftBracket
         Lexeme.RightBracket
         Lexeme.LeftBracket
         Lexeme.RightBracket ]
-    test <@ ParserHelper.Match ([], expected) = actual @>
+    test <@ Match ([], expected) = actual @>
 
 [<Fact>]
 let ``Expression: nested function call`` () =
     let funCallG = Cst.FunCall { func = Cst.Ref "g"; arguments = []; }
     let funCallH = Cst.FunCall { func = Cst.Ref "h"; arguments = []; }
     let expected = Cst.FunCall { func = Cst.Ref "f"; arguments = [funCallG; funCallH]; }
-    let actual = CstParser.ParseExpression.tryExpression [
+    let actual = ParseExpression.tryExpression [
         Lexeme.Identifier "f"
         Lexeme.LeftBracket
         Lexeme.Identifier "g"
@@ -395,4 +399,4 @@ let ``Expression: nested function call`` () =
         Lexeme.LeftBracket
         Lexeme.RightBracket
         Lexeme.RightBracket ]
-    test <@ ParserHelper.Match ([], expected) = actual @>
+    test <@ Match ([], expected) = actual @>

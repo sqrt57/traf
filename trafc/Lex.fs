@@ -1,34 +1,13 @@
 namespace Triton
 
-open System
-open System.Text
-open System.Collections.Generic
+module Lex =
 
-[<AutoOpen>]
-module LexemeModule =
+    open System
+    open System.Text
+    open System.Collections.Generic
 
-    [<RequireQualifiedAccess>]
-    type Lexeme =
-        | Identifier of string
-        | Operator of string
-        | StringLiteral of string
-        | CharLiteral of char
-        | Int of int64
-        | LeftCurly
-        | RightCurly
-        | LeftBracket
-        | RightBracket
-        | LeftSquare
-        | RightSquare
-        | Dot
-        | Comma
-        | Semicolon
-        | Caret
-        | AtSign
-
-module Lexer =
-
-    exception LexerError of {| message: string |}
+    open Error
+    open Lexeme
 
     let private isIdentStart (c : char) = Char.IsLetter c || c = '_'
 

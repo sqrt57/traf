@@ -8,9 +8,9 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Include="lexer.fs" />
-    <Compile Include="CstParser.fs" />
-    <Compile Include="PeCoff.fs" />
+    <Compile Include="Lex.fs" />
+    <Compile Include="CstParse.fs" />
+    <Compile Include="PeCoffAllocate.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 
