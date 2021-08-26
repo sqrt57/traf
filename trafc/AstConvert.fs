@@ -4,52 +4,28 @@ module AstConvert =
 
     open Error
 
-    let rec private toConstExpr expr =
-        match expr with
-        | Cst.IntVal i -> Ast.ConstExprAttr (Ast.ConstExpr.IntVal i, ())
-        | Cst.CharVal c -> Ast.ConstExprAttr (Ast.ConstExpr.CharVal c, ())
-        | Cst.BoolVal b -> Ast.ConstExprAttr (Ast.ConstExpr.BoolVal b, ())
-        | Cst.StringVal s -> Ast.ConstExprAttr (Ast.ConstExpr.StringVal s, ())
-        | Cst.Ref r -> Ast.ConstExprAttr (Ast.ConstExpr.Ref r, ())
-        | Cst.Null -> Ast.ConstExprAttr (Ast.ConstExpr.Null, ())
-        | Cst.AddressOf expr -> Ast.ConstExprAttr (Ast.ConstExpr.AddressOf (toConstExpr expr), ())
-        | Cst.Negate (Cst.IntVal i) -> Ast.ConstExprAttr (Ast.ConstExpr.IntVal (-i), ())
-        | Cst.Negate expr -> Ast.ConstExprAttr (Ast.ConstExpr.Negate (toConstExpr expr), ())
-        | Cst.FunCall { func = Cst.Ref "length"; arguments = [arg] } ->
-            Ast.ConstExprAttr (Ast.ConstExpr.Length (toConstExpr arg), ())
-        | Cst.FunCall { func = Cst.Ref "length"; arguments = _ } ->
-            raise (AstConvertError {| message = "length() accepts exactly one argument" |})
-        | Cst.FunCall { func = Cst.Ref "sizeof"; arguments = [arg] } ->
-            Ast.ConstExprAttr (Ast.ConstExpr.SizeOf (toConstExpr arg), ())
-        | Cst.FunCall { func = Cst.Ref "sizeof"; arguments = _ } ->
-            raise (AstConvertError {| message = "sizeof() accepts exactly one argument" |})
-        | Cst.FunCall { func = _; arguments = _ } ->
-            raise (AstConvertError {| message = "function call is illegal in constant expression" |})
-        | Cst.Operator { left = left; op = op; right = right } ->
-            Ast.ConstExprAttr (Ast.ConstExpr.Operator { left = toConstExpr left; op = op; right = toConstExpr right }, ())
-
     let rec private toExpr expr =
         match expr with
-        | Cst.IntVal i -> Ast.Expr.IntVal i
-        | Cst.CharVal c -> Ast.Expr.CharVal c
-        | Cst.BoolVal b -> Ast.Expr.BoolVal b
-        | Cst.StringVal s -> Ast.Expr.StringVal s
-        | Cst.Ref r -> Ast.Expr.Ref r
-        | Cst.Null -> Ast.Expr.Null
-        | Cst.AddressOf expr -> Ast.Expr.AddressOf (toExpr expr)
-        | Cst.Negate expr -> Ast.Expr.Negate (toExpr expr)
+        | Cst.IntVal i -> Ast.ExprAttr (Ast.IntVal i, ())
+        | Cst.CharVal c -> Ast.ExprAttr (Ast.CharVal c, ())
+        | Cst.BoolVal b -> Ast.ExprAttr (Ast.BoolVal b, ())
+        | Cst.StringVal s -> Ast.ExprAttr (Ast.StringVal s, ())
+        | Cst.Ref r -> Ast.ExprAttr (Ast.Ref r, ())
+        | Cst.Null -> Ast.ExprAttr (Ast.Null, ())
+        | Cst.AddressOf expr -> Ast.ExprAttr (Ast.AddressOf (toExpr expr), ())
+        | Cst.Negate expr -> Ast.ExprAttr (Ast.Negate (toExpr expr), ())
         | Cst.FunCall { func = Cst.Ref "length"; arguments = [arg] } ->
-            Ast.Expr.Length (toExpr arg)
+            Ast.ExprAttr (Ast.Length (toExpr arg), ())
         | Cst.FunCall { func = Cst.Ref "length"; arguments = _ } ->
             raise (AstConvertError {| message = "length() accepts exactly one argument" |})
         | Cst.FunCall { func = Cst.Ref "sizeof"; arguments = [arg] } ->
-            Ast.Expr.SizeOf (toExpr arg)
+            Ast.ExprAttr (Ast.SizeOf (toExpr arg), ())
         | Cst.FunCall { func = Cst.Ref "sizeof"; arguments = _ } ->
             raise (AstConvertError {| message = "sizeof() accepts exactly one argument" |})
         | Cst.FunCall { func = func; arguments = arguments } ->
-            Ast.Expr.FunCall { func = toExpr func; arguments = List.map toExpr arguments }
+            Ast.ExprAttr (Ast.FunCall { func = toExpr func; arguments = List.map toExpr arguments }, ())
         | Cst.Operator { left = left; op = op; right = right } ->
-            Ast.Expr.Operator { left = toExpr left; op = op; right = toExpr right }
+            Ast.ExprAttr (Ast.Operator { left = toExpr left; op = op; right = toExpr right }, ())
 
     let rec private toType type_ =
         match type_ with
@@ -60,7 +36,7 @@ module AstConvert =
         | Cst.Fun f -> Ast.Fun (toFunType f)
         | Cst.Tuple t -> Ast.Tuple (toTypeTuple t)
     and private toTypeTupleSlot ({ name = name; type_ = type_ } : Cst.TypeTupleSlot) =
-        { name = name; type_ = toType type_ } : Ast.TypeTupleSlot
+        { name = name; type_ = toType type_ } : Ast.TypeTupleSlot<unit>
     and private toTypeTuple (Cst.TypeTuple t) = Ast.TypeTuple (List.map toTypeTupleSlot t)
     and private toFunType { arguments = arguments; result = result } =
         { arguments = toTypeTuple arguments; result = toTypeTuple result }
@@ -114,7 +90,7 @@ module AstConvert =
         ( { name = name
             type_ = type_
             body = Cst.FunBody body
-            attributes = attributes } : Cst.FunDefinition) : Ast.FunDefinition =
+            attributes = attributes } : Cst.FunDefinition) : Ast.FunDefinition<unit> =
         let initial : Ast.FunAttrs = { entry = false }
         let attrs = foldAttrLists fromFunAttr initial attributes
         { name = name
@@ -125,7 +101,7 @@ module AstConvert =
     let private toExternFun
         ( { name = name
             type_ = type_
-            attributes = attributes } : Cst.ExternFunDefinition) : Ast.ExternFunDefinition =
+            attributes = attributes } : Cst.ExternFunDefinition) : Ast.ExternFunDefinition<unit> =
         let initial : Ast.ExternFunAttrs = { dll_import = None; dll_entry_point_name = None; dll_entry_point_ordinal = None }
         let attrs = foldAttrLists fromExternFunAttr initial attributes
         { name = name
@@ -135,9 +111,9 @@ module AstConvert =
     let private toModuleItem moduleItem =
         match moduleItem with
         | Cst.ConstDefinition { name = name; type_ = type_; value = value } ->
-            Ast.ConstDefinition { name = name; type_ = toType type_; value = toConstExpr value }
+            Ast.ConstDefinition { name = name; type_ = toType type_; value = toExpr value }
         | Cst.VarDefinition { name = name; type_ = type_; value = value } ->
-            Ast.VarDefinition { name = name; type_ = toType type_; value = Option.map toConstExpr value }
+            Ast.VarDefinition { name = name; type_ = toType type_; value = Option.map toExpr value }
         | Cst.FunDefinition f -> Ast.FunDefinition (toFun f)
         | Cst.ExternFunDefinition ef -> Ast.ExternFunDefinition (toExternFun ef)
 

@@ -7,7 +7,7 @@ module MarkTypes =
     open LangType
 
     let markTypes =
-        { new ISynthesizedAttribute<unit, Type> with
+        { new ILrAttribute<unit, Type> with
             member this.intVal value source = Int
             member this.charVal value source = Char
             member this.boolVal value source = Bool
@@ -17,6 +17,7 @@ module MarkTypes =
             member this.length arg source = None
             member this.sizeOf arg source = None
             member this.addressOf arg source = None
+            member this.funCall func args source = None
             member this.negate arg source =
                 match arg with
                 | Int -> Int

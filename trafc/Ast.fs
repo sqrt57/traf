@@ -2,68 +2,54 @@ namespace Triton
 
 module Ast =
 
-    type ConstExpr<'typ> =
+    type Expr<'exprAttr> =
         | IntVal of int64
         | CharVal of char
         | BoolVal of bool
         | StringVal of string
         | Ref of string
         | Null
-        | Length of ConstExprAttr<'typ>
-        | SizeOf of ConstExprAttr<'typ>
-        | AddressOf of ConstExprAttr<'typ>
-        | Negate of ConstExprAttr<'typ>
-        | Operator of ConstOperatorCall<'typ>
-    and ConstOperatorCall<'typ> = { left: ConstExprAttr<'typ>; op: string; right: ConstExprAttr<'typ>; }
-    and ConstExprAttr<'typ> = ConstExprAttr of ConstExpr<'typ> * 'typ
+        | Length of ExprAttr<'exprAttr>
+        | SizeOf of ExprAttr<'exprAttr>
+        | AddressOf of ExprAttr<'exprAttr>
+        | Negate of ExprAttr<'exprAttr>
+        | FunCall of FunCall<'exprAttr>
+        | Operator of OperatorCall<'exprAttr>
+    and FunCall<'exprAttr> = { func: ExprAttr<'exprAttr>; arguments: ExprAttr<'exprAttr> list; }
+    and OperatorCall<'exprAttr> = { left: ExprAttr<'exprAttr>; op: string; right: ExprAttr<'exprAttr>; }
+    and ExprAttr<'exprAttr> = ExprAttr of expr: Expr<'exprAttr> * attr: 'exprAttr
 
-    type Expr =
-        | IntVal of int64
-        | CharVal of char
-        | BoolVal of bool
-        | StringVal of string
-        | Ref of string
-        | Null
-        | Length of Expr
-        | SizeOf of Expr
-        | AddressOf of Expr
-        | Negate of Expr
-        | FunCall of FunCall
-        | Operator of OperatorCall
-    and FunCall = { func: Expr; arguments: Expr list; }
-    and OperatorCall = { left: Expr; op: string; right: Expr; }
-
-    type Type =
+    type Type<'exprAttr> =
         | TypeRef of string
-        | Array of ArrayType
-        | Pointer of Type
-        | Fun of FunType
-        | Tuple of TypeTuple
-    and TypeTupleSlot = { name: string option; type_: Type }
-    and TypeTuple = TypeTuple of TypeTupleSlot list
-    and FunType = { arguments: TypeTuple; result: TypeTuple }
-    and ArrayType = { type_: Type; size: Expr option }
+        | Array of ArrayType<'exprAttr>
+        | Pointer of Type<'exprAttr>
+        | Fun of FunType<'exprAttr>
+        | Tuple of TypeTuple<'exprAttr>
+    and TypeTupleSlot<'exprAttr> = { name: string option; type_: Type<'exprAttr> }
+    and TypeTuple<'exprAttr> = TypeTuple of TypeTupleSlot<'exprAttr> list
+    and FunType<'exprAttr> = { arguments: TypeTuple<'exprAttr>; result: TypeTuple<'exprAttr> }
+    and ArrayType<'exprAttr> = { type_: Type<'exprAttr>; size: ExprAttr<'exprAttr> option }
 
-    type ConstDefinition<'expr> = { name: string; type_: Type; value: 'expr; }
+    type ConstDefinition<'exprAttr> = { name: string; type_: Type<'exprAttr>; value: ExprAttr<'exprAttr>; }
 
-    type VarDefinition<'expr> = { name: string; type_: Type; value: 'expr option; }
+    type VarDefinition<'exprAttr> = { name: string; type_: Type<'exprAttr>; value: ExprAttr<'exprAttr> option; }
 
-    type Assignment = { name: string; value: Expr; }
+    type Assignment<'exprAttr> = { name: string; value: ExprAttr<'exprAttr>; }
 
-    type Statement =
-        | ConstStatement of ConstDefinition<Expr>
-        | VarStatement of VarDefinition<Expr>
-        | Assignment of Assignment
-        | Expression of Expr
+    type Statement<'exprAttr> =
+        | ConstStatement of ConstDefinition<'exprAttr>
+        | VarStatement of VarDefinition<'exprAttr>
+        | Assignment of Assignment<'exprAttr>
+        | Expression of ExprAttr<'exprAttr>
 
-    type FunBody = FunBody of Statement list
+    type FunBody<'exprAttr> = FunBody of Statement<'exprAttr> list
 
     type FunAttrs = { entry: bool }
 
-    type FunDefinition =
+    type FunDefinition<'exprAttr> =
         { name: string
-          type_: FunType
-          body: FunBody
+          type_: FunType<'exprAttr>
+          body: FunBody<'exprAttr>
           attrs: FunAttrs }
 
     type ExternFunAttrs =
@@ -71,90 +57,28 @@ module Ast =
           dll_entry_point_name: string option
           dll_entry_point_ordinal: int64 option }
 
-    type ExternFunDefinition =
+    type ExternFunDefinition<'exprAttr> =
         { name: string
-          type_: FunType
+          type_: FunType<'exprAttr>
           attrs: ExternFunAttrs }
 
-    type ModuleItem<'typ> =
-        | ConstDefinition of ConstDefinition<ConstExprAttr<'typ>>
-        | VarDefinition of VarDefinition<ConstExprAttr<'typ>>
-        | FunDefinition of FunDefinition
-        | ExternFunDefinition of ExternFunDefinition
+    type ModuleItem<'exprAttr> =
+        | ConstDefinition of ConstDefinition<'exprAttr>
+        | VarDefinition of VarDefinition<'exprAttr>
+        | FunDefinition of FunDefinition<'exprAttr>
+        | ExternFunDefinition of ExternFunDefinition<'exprAttr>
 
-    type ModuleTopLevel<'typ> = ModuleTopLevel of ModuleItem<'typ> list
+    type ModuleTopLevel<'exprAttr> = ModuleTopLevel of ModuleItem<'exprAttr> list
 
-    type Module<'typ> = { name: string; definitions: ModuleTopLevel<'typ> }
+    type Module<'exprAttr> = { name: string; definitions: ModuleTopLevel<'exprAttr> }
 
-    type TopLevel<'typ> = TopLevel of Module<'typ> list
+    type TopLevel<'exprAttr> = TopLevel of Module<'exprAttr> list
 
 module AstTransform =
 
     open Ast
 
-    type IBottomFold<'topLevel, 'modul, 'modulDef, 'statement, 'constExpr, 'expr, 'funType, 'typ,
-                     'topLevelAttr, 'moduleAttr,
-                     'constDefAttr, 'varDefAttr, 'externFunDefAttr, 'funDefAttr,
-                     'constStatementAttr, 'varStatementAttr, 'assignmentStatementAttr, 'exprStatementAttr,
-                     'funTypeAttr, 'typeAttr, 'constExprAttr, 'exprAttr> =
-
-        abstract member topLevel: modules: 'modul list  -> attr: 'topLevelAttr -> 'topLevel
-        abstract member modul: name: string -> definitions: 'modulDef list -> attr: 'moduleItem -> 'modul
-
-        abstract member constDef: name: string -> typ: 'typ -> value: 'constExpr ->
-                                  attr: 'constDefAttr -> 'moduleDef
-        abstract member varDef: name: string -> typ: 'typ -> value: 'constExpr option ->
-                                attr: 'varDefAttr -> 'moduleDef
-        abstract member externFunDef: name: string -> typ: 'funType -> attributes: ExternFunAttrs ->
-                                      attr: 'externFunDefAttr -> 'moduleDef
-        abstract member funDef: name: string -> typ: 'funType -> attributes: FunAttrs -> body: 'statement list ->
-                                      attr: 'funDefAttr -> 'moduleDef
-
-        abstract member constStatement: name: string -> typ: 'typ -> value: 'expr ->
-                                        attr: 'constStatementAttr -> 'statement
-        abstract member varStatement: name: string -> typ: 'typ -> value: 'expr option ->
-                                      attr: 'varStatementAttr -> 'statement
-        abstract member assignmentStatement: name: string -> value: 'expr ->
-                                             attr: 'assignmentStatementAttr -> 'statement
-        abstract member exprStatement: value: 'expr ->
-                                       attr: 'exprStatementAttr -> 'statement
-
-
-        abstract member funSignature: arguments: (string option * 'typ) list -> result: (string option * 'typ) list ->
-                                      attr: 'funTypeAttr -> 'funType
-        abstract member typeRef: name: string -> attr: 'typeAttr -> 'typ
-        abstract member arrayType: elementType: 'typ -> size: 'expr option ->
-                                   attr: 'typeAttr -> 'typ
-        abstract member pointerType: elementType: 'typ -> attr: 'typeAttr -> 'typ
-        abstract member funType: arguments: (string option * 'typ) list -> result: (string option * 'typ) list ->
-                                 attr: 'typeAttr -> 'typ
-
-        abstract member constIntVal: value: int64 -> attr: 'constExprAttr -> 'constExpr
-        abstract member constCharVal: value: char -> attr: 'constExprAttr -> 'constExpr
-        abstract member constBoolVal: value: bool -> attr: 'constExprAttr -> 'constExpr
-        abstract member constStringVal: value: string -> attr: 'constExprAttr -> 'constExpr
-        abstract member constReference: value: string -> attr: 'constExprAttr -> 'constExpr
-        abstract member constNull_: attr: 'constExprAttr -> 'constExpr
-        abstract member constLength: arg: 'constExpr -> attr: 'constExprAttr -> 'constExpr
-        abstract member constSizeOf: arg: 'constExpr -> attr: 'constExprAttr -> 'constExpr
-        abstract member constAddressOf: arg: 'constExpr -> attr: 'constExprAttr -> 'constExpr
-        abstract member constNegate: arg: 'constExpr -> attr: 'constExprAttr -> 'constExpr
-        abstract member constOperator: left: 'constExpr -> op: string -> right: 'constExpr -> attr: 'constExprAttr -> 'constExpr
-
-        abstract member intVal: value: int64 -> attr: 'exprAttr -> 'expr
-        abstract member charVal: value: char -> attr: 'exprAttr -> 'expr
-        abstract member boolVal: value: bool -> attr: 'exprAttr -> 'expr
-        abstract member stringVal: value: string -> attr: 'exprAttr -> 'expr
-        abstract member reference: value: string -> attr: 'exprAttr -> 'expr
-        abstract member null_: attr: 'exprAttr -> 'expr
-        abstract member length: arg: 'expr -> attr: 'exprAttr -> 'expr
-        abstract member sizeOf: arg: 'expr -> attr: 'exprAttr -> 'expr
-        abstract member addressOf: arg: 'expr -> attr: 'exprAttr -> 'expr
-        abstract member negate: arg: 'expr -> attr: 'exprAttr -> 'expr
-        abstract member funCall: left: 'expr -> op: string -> right: 'expr -> attr: 'exprAttr -> 'expr
-        abstract member operator: left: 'expr -> op: string -> right: 'expr -> attr: 'exprAttr -> 'expr
-
-    type ISynthesizedAttribute<'source, 'target> =
+    type ILrAttribute<'source, 'target> =
         abstract member intVal: value: int64 -> source: 'source -> 'target
         abstract member charVal: value: char -> source: 'source -> 'target
         abstract member boolVal: value: bool -> source: 'source -> 'target
@@ -165,51 +89,88 @@ module AstTransform =
         abstract member sizeOf: arg: 'target -> source: 'source -> 'target
         abstract member addressOf: arg: 'target -> source: 'source -> 'target
         abstract member negate: arg: 'target -> source: 'source -> 'target
+        abstract member funCall: func: 'target -> args: 'target list -> source: 'source -> 'target
         abstract member operator: left: 'target -> op: string -> right: 'target -> source: 'source -> 'target
 
-    let synthesizeAttr<'source, 'target>
-            (attr: ISynthesizedAttribute<'source, 'target>)
+    let calcLrAttribute<'source, 'target>
+            (attr: ILrAttribute<'source, 'target>)
             (ast: TopLevel<'source>) : TopLevel<'target> =
-        let rec constExpr (ConstExprAttr (expr, srcAttr)) =
+
+        let rec toExpr (ExprAttr (expr, srcAttr)) =
             match expr with
-            | ConstExpr.IntVal i -> ConstExprAttr (ConstExpr.IntVal i, attr.intVal i srcAttr)
-            | ConstExpr.CharVal c -> ConstExprAttr (ConstExpr.CharVal c, attr.charVal c srcAttr)
-            | ConstExpr.BoolVal b -> ConstExprAttr (ConstExpr.BoolVal b, attr.boolVal b srcAttr)
-            | ConstExpr.StringVal s -> ConstExprAttr (ConstExpr.StringVal s, attr.stringVal s srcAttr)
-            | ConstExpr.Ref r -> ConstExprAttr (ConstExpr.Ref r, attr.reference r srcAttr)
-            | ConstExpr.Null -> ConstExprAttr (ConstExpr.Null, attr.null_ srcAttr)
-            | ConstExpr.AddressOf argExpr -> 
-                let argExpr = constExpr argExpr
-                let (ConstExprAttr (_, argAttr)) = argExpr
-                ConstExprAttr (ConstExpr.AddressOf argExpr, attr.addressOf argAttr srcAttr)
-            | ConstExpr.Length argExpr -> 
-                let argExpr = constExpr argExpr
-                let (ConstExprAttr (_, argAttr)) = argExpr
-                ConstExprAttr (ConstExpr.Length argExpr, attr.addressOf argAttr srcAttr)
-            | ConstExpr.SizeOf argExpr -> 
-                let argExpr = constExpr argExpr
-                let (ConstExprAttr (_, argAttr)) = argExpr
-                ConstExprAttr (ConstExpr.SizeOf argExpr, attr.addressOf argAttr srcAttr)
-            | ConstExpr.Negate argExpr -> 
-                let argExpr = constExpr argExpr
-                let (ConstExprAttr (_, argAttr)) = argExpr
-                ConstExprAttr (ConstExpr.Negate argExpr, attr.addressOf argAttr srcAttr)
-            | ConstExpr.Operator { left = leftExpr; op = op; right = rightExpr } ->
-                let leftExpr = constExpr leftExpr
-                let (ConstExprAttr (_, leftAttr)) = leftExpr
-                let rightExpr = constExpr rightExpr
-                let (ConstExprAttr (_, rightAttr)) = rightExpr
-                ConstExprAttr (ConstExpr.Operator { left = leftExpr; op = op; right = rightExpr },
+            | Expr.IntVal i -> ExprAttr (Expr.IntVal i, attr.intVal i srcAttr)
+            | Expr.CharVal c -> ExprAttr (Expr.CharVal c, attr.charVal c srcAttr)
+            | Expr.BoolVal b -> ExprAttr (Expr.BoolVal b, attr.boolVal b srcAttr)
+            | Expr.StringVal s -> ExprAttr (Expr.StringVal s, attr.stringVal s srcAttr)
+            | Expr.Ref r -> ExprAttr (Expr.Ref r, attr.reference r srcAttr)
+            | Expr.Null -> ExprAttr (Expr.Null, attr.null_ srcAttr)
+            | Expr.AddressOf argExpr -> 
+                let argExpr = toExpr argExpr
+                let (ExprAttr (_, argAttr)) = argExpr
+                ExprAttr (Expr.AddressOf argExpr, attr.addressOf argAttr srcAttr)
+            | Expr.Length argExpr -> 
+                let argExpr = toExpr argExpr
+                let (ExprAttr (_, argAttr)) = argExpr
+                ExprAttr (Expr.Length argExpr, attr.length argAttr srcAttr)
+            | Expr.SizeOf argExpr -> 
+                let argExpr = toExpr argExpr
+                let (ExprAttr (_, argAttr)) = argExpr
+                ExprAttr (Expr.SizeOf argExpr, attr.sizeOf argAttr srcAttr)
+            | Expr.Negate argExpr -> 
+                let argExpr = toExpr argExpr
+                let (ExprAttr (_, argAttr)) = argExpr
+                ExprAttr (Expr.Negate argExpr, attr.negate argAttr srcAttr)
+            | Expr.FunCall { func = funcExpr; arguments = argumentExprs } ->
+                let funcExpr = toExpr funcExpr
+                let (ExprAttr (_, funcAttr)) = funcExpr
+                let argumentExprs = List.map toExpr argumentExprs
+                let argumentAttrs = List.map (fun (ExprAttr (_, attr)) -> attr) argumentExprs
+                ExprAttr (Expr.FunCall { func = funcExpr; arguments = argumentExprs },
+                               attr.funCall funcAttr argumentAttrs srcAttr)
+            | Expr.Operator { left = leftExpr; op = op; right = rightExpr } ->
+                let leftExpr = toExpr leftExpr
+                let (ExprAttr (_, leftAttr)) = leftExpr
+                let rightExpr = toExpr rightExpr
+                let (ExprAttr (_, rightAttr)) = rightExpr
+                ExprAttr (Expr.Operator { left = leftExpr; op = op; right = rightExpr },
                                attr.operator leftAttr op rightAttr srcAttr)
+
+        let rec toType typ =
+            match typ with
+            | TypeRef r -> TypeRef r
+            | Array { type_ = type_; size = size } ->
+                Array { type_ = toType type_; size = Option.map toExpr size }
+            | Pointer t -> Pointer (toType t)
+            | Fun t -> Fun (toFunType t)
+            | Tuple tt -> Tuple (toTypeTuple tt)
+        and toFunType { arguments = arguments; result = result } =
+            { arguments = toTypeTuple arguments; result = toTypeTuple result }
+        and toTypeTuple (TypeTuple t) = TypeTuple (List.map toTypeTupleSlot t)
+        and toTypeTupleSlot ({ name = name; type_ = type_ }: TypeTupleSlot<'source>) =
+            { name = name; type_ = toType type_ }
+
+        let toStatement statement =
+            match statement with
+            | ConstStatement { name = name; type_ = type_; value = value; } ->
+                ConstStatement { name = name; type_ = toType type_; value = toExpr value; }
+            | VarStatement { name = name; type_ = type_; value = value; } ->
+                VarStatement { name = name; type_ = toType type_; value = Option.map toExpr value; }
+            | Assignment { name = name; value = value; } ->
+                Assignment { name = name; value = toExpr value; }
+            | Expression e -> Expression (toExpr e)
+
+        let toBody (FunBody statements) = FunBody (List.map toStatement statements)
 
         let toModuleItem moduleItem =
             match moduleItem with
             | ConstDefinition { name = name; type_ = type_; value = value } ->
-                ConstDefinition { name = name; type_ = type_; value = constExpr value }
+                ConstDefinition { name = name; type_ = toType type_; value = toExpr value }
             | VarDefinition { name = name; type_ = type_; value = value } ->
-                VarDefinition { name = name; type_ = type_; value = Option.map constExpr value }
-            | FunDefinition f -> FunDefinition f
-            | ExternFunDefinition ef -> ExternFunDefinition ef
+                VarDefinition { name = name; type_ = toType type_; value = Option.map toExpr value }
+            | FunDefinition { name = name; type_ = type_; body = body; attrs = attrs } ->
+                FunDefinition { name = name; type_ = toFunType type_; body = toBody body; attrs = attrs }
+            | ExternFunDefinition { name = name; type_ = type_; attrs = attrs } ->
+                ExternFunDefinition { name = name; type_ = toFunType type_; attrs = attrs }
 
         let module_ cstModule =
             let (ModuleTopLevel definitions) = cstModule.definitions
