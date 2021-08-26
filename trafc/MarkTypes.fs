@@ -3,7 +3,7 @@ namespace Triton
 module MarkTypes =
 
     open Error
-    open AstTransformer
+    open AstTransform
     open LangType
 
     let markTypes =
