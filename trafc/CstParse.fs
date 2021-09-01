@@ -377,7 +377,7 @@ module CstParse =
 
         let funAttr = parseSeq {
             let! name = tryMatchIdentifier
-            let! value = maybeParse Cst.None (parseSeq {
+            let! value = maybeParse Cst.NoneValue (parseSeq {
                 do! tryMatchEq (Lexeme.Operator "=")
                 return! failIfNoMatch (tryParsers [
                     parseSeq { let! value = tryMatchInt in return Cst.Int value }

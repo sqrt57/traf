@@ -22,8 +22,8 @@ module Drive =
           contents: string
           lexemes: Lexeme.Lexeme list
           cst: Cst.TopLevel
-          ast: Ast.TopLevel<unit>
-          astWithTypes: Ast.TopLevel<LangType.Type> }
+          ast: AstConvert.AstEmpty
+          astWithTypes: MarkTypes.AstWithTypes }
 
     let compileModule fileName =
 
@@ -31,7 +31,7 @@ module Drive =
         let lexemes = Lex.lex contents |> List.ofSeq
         let cst = CstParse.parse lexemes
         let ast = AstConvert.convert cst
-        let astWithTypes = AstTransform.calcLrAttribute MarkTypes.markTypes ast
+        let astWithTypes = MarkTypes.markTypes ast
 
         { fileName = fileName
           contents = contents

@@ -267,7 +267,7 @@ let ``Module: external function definition`` () =
               attributes = Cst.AttrLists [
                   Cst.AttrList [ { name = "dll_import"; value = Cst.String "kernel32.dll" }
                                  { name = "entry_point"; value = Cst.Int 5L } ]
-                  Cst.AttrList [ { name = "std_call"; value = Cst.None } ] ] }
+                  Cst.AttrList [ { name = "std_call"; value = Cst.NoneValue } ] ] }
     let actual = ParseModule.moduleBodyItem [
         Lexeme.LeftSquare
         Lexeme.Identifier "dll_import"

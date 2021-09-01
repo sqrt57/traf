@@ -28,7 +28,7 @@ module Cst =
     and ArrayType = { type_: Type; size: Expr option }
 
     type AttrValue =
-        | None
+        | NoneValue
         | String of string
         | Int of int64
     type AttrDefinition = { name: string; value: AttrValue }
