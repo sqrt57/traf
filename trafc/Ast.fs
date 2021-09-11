@@ -20,15 +20,15 @@ module Ast =
     and ExprAttr<'expr> = ExprAttr of expr: Expr<'expr> * attr: 'expr
 
     type Type<'expr, 'typ> =
-        | TypeRef of string
+        | TypeRef of attr: 'typ * name: string
         | Array of ArrayType<'expr, 'typ>
-        | Pointer of Type<'expr, 'typ>
+        | Pointer of attr: 'typ * typ: Type<'expr, 'typ>
         | Fun of FunType<'expr, 'typ>
-        | Tuple of TypeTuple<'expr, 'typ>
+        | Tuple of 'typ * TypeTuple<'expr, 'typ>
     and TypeTupleSlot<'expr, 'typ> = { name: string option; type_: Type<'expr, 'typ> }
     and TypeTuple<'expr, 'typ> = TypeTuple of TypeTupleSlot<'expr, 'typ> list
-    and FunType<'expr, 'typ> = { arguments: TypeTuple<'expr, 'typ>; result: TypeTuple<'expr, 'typ> }
-    and ArrayType<'expr, 'typ> = { type_: Type<'expr, 'typ>; size: ExprAttr<'expr> option }
+    and FunType<'expr, 'typ> = { arguments: TypeTuple<'expr, 'typ>; result: TypeTuple<'expr, 'typ>; attr: 'typ }
+    and ArrayType<'expr, 'typ> = { type_: Type<'expr, 'typ>; size: ExprAttr<'expr> option; attr: 'typ }
 
     type ConstDefinition<'itemAttr, 'expr, 'typ> =
         { name: string; type_: Type<'expr, 'typ>; value: ExprAttr<'expr>; attr: 'itemAttr }
@@ -100,16 +100,18 @@ module AstCreate =
     let funCallExpr attr func args = ExprAttr(FunCall { func = func; arguments = args; }, attr)
     let operatorExpr attr left op right = ExprAttr(Operator { left = left; op = op; right = right; }, attr)
 
-    let refType attr name = TypeRef name
-    let arrayType attr typ size = Array { type_ = typ; size = size; }
-    let pointerType attr typ = Pointer typ
+    let refType attr name = TypeRef (attr = attr, name = name)
+    let arrayType attr typ size = Array { type_ = typ; size = size; attr = attr }
+    let pointerType attr typ = Pointer (attr = attr, typ = typ)
     let private argType attr (name, typ) = { name = name; type_ = typ; }
     let funType attr args result =
         Fun { arguments = TypeTuple (List.map (argType attr) args)
-              result = TypeTuple (List.map (argType attr) result) }
+              result = TypeTuple (List.map (argType attr) result)
+              attr = attr }
     let funDefType attr args result =
         { arguments = TypeTuple (List.map (argType attr) args)
-          result = TypeTuple (List.map (argType attr) result) }
+          result = TypeTuple (List.map (argType attr) result)
+          attr = attr }
 
     let constStmt attr name typ value = ConstStatement { name = name; type_ = typ; value = value; attr = attr; }
     let varStmt attr name typ value = VarStatement { name = name; type_ = typ; value = value; attr = attr; }
@@ -129,7 +131,15 @@ module AstRead =
 
     open Ast
 
-    let typeAttr typ = raise (System.NotImplementedException())
+    let typeAttr typ =
+        match typ with
+        | TypeRef (attr = attr) -> attr
+        | Array { attr = attr } -> attr
+        | Pointer (attr = attr) -> attr
+        | Fun { attr = attr } -> attr
+        | Tuple _ -> raise (System.InvalidOperationException())
+
+    let funTypeAttr ({ attr = attr }: FunType<'expr, 'typ>) = attr
 
     let exprAttr (ExprAttr (_, childAttr)) = childAttr
 
@@ -138,7 +148,7 @@ module AstRead =
         | ConstStatement constStmt -> constStmt.attr
         | VarStatement varStmt -> varStmt.attr
         | Assignment assign -> assign.attr
-        | Expression (_, attr) -> attr
+        | Expression (attr = attr) -> attr
 
     let defAttr def =
         match def with
@@ -283,16 +293,16 @@ module AstTransform =
         let rec toType context typ =
             let source = typeAttr typ
             match typ with
-            | TypeRef r ->
-                let target = visitor.typeRef r context source
-                refType target r 
+            | TypeRef (name = name) ->
+                let target = visitor.typeRef name context source
+                refType target name 
             | Array { type_ = typ; size = size } ->
                 let exprContext = visitor.typeArraySize context (typeAttr typ)
                 let typ = toType context typ
                 let size = Option.map (toExpr exprContext) size
                 let target = visitor.typeArray (typeAttr typ) (Option.map exprAttr size) context source
                 arrayType target typ size
-            | Pointer typ ->
+            | Pointer (typ = typ) ->
                 let typ = toType context typ
                 let target = visitor.typePointer (typeAttr typ) context source
                 pointerType target typ
@@ -303,14 +313,15 @@ module AstTransform =
                 let resultAttr = mapTypeTuple typeAttr result
                 let target = visitor.typeFun argsAttr resultAttr context source
                 funType target args result
-            | Tuple tt -> raise (System.InvalidOperationException())
+            | Tuple _ -> raise (System.InvalidOperationException())
 
-        let toFunType context { arguments = args; result = result; } =
+        let toFunType context typ =
+            let { arguments = args; result = result; } = typ
             let args = mapTypeTuple (toType context) (fromTypeTuple args)
             let result = mapTypeTuple (toType context) (fromTypeTuple result)
             let argsAttr = mapTypeTuple typeAttr args
             let resultAttr = mapTypeTuple typeAttr result
-            let source = raise (System.NotImplementedException())
+            let source = funTypeAttr typ
             let target = visitor.typeFunDef argsAttr resultAttr context source
             funDefType target args result
 
