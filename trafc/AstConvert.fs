@@ -6,7 +6,7 @@ module AstConvert =
     open Cst
     open AstCreate
 
-    type AstEmpty = Ast.TopLevel<unit, unit, unit, unit>
+    type AstEmpty = Ast.TopLevel<unit, unit, unit, unit, unit>
 
     let rec private toExpr expr =
         match expr with
@@ -33,17 +33,17 @@ module AstConvert =
 
     let rec private toType type_ =
         match type_ with
-        | TypeRef s -> refType s
+        | TypeRef s -> refType () s
         | Array { type_ = type_; size = size } ->
-            arrayType (toType type_) (Option.map toExpr size)
-        | Pointer type_ -> pointerType (toType type_)
+            arrayType () (toType type_) (Option.map toExpr size)
+        | Pointer type_ -> pointerType () (toType type_)
         | Fun { arguments = TypeTuple arguments; result = TypeTuple result } ->
-            funType (List.map typeTupleSlot arguments) (List.map typeTupleSlot result)
+            funType () (List.map typeTupleSlot arguments) (List.map typeTupleSlot result)
         | Tuple _ -> raise (AstConvertError {| message = "type tuple is not supported" |})
-    and typeTupleSlot ({ name = name; type_ = typ; }: TypeTupleSlot) = argType name (toType typ)
+    and typeTupleSlot ({ name = name; type_ = typ; }: TypeTupleSlot) = (name, (toType typ))
 
     let toFunType ({ arguments = TypeTuple arguments; result = TypeTuple result }: FunType) =
-        funDefType (List.map typeTupleSlot arguments) (List.map typeTupleSlot result)
+        funDefType () (List.map typeTupleSlot arguments) (List.map typeTupleSlot result)
 
     let private toFunBodyItem funBodyItem =
         match funBodyItem with
@@ -122,4 +122,4 @@ module AstConvert =
 
     let private topLevel (TopLevel modules) = AstCreate.topLevel (List.map toModule modules)
 
-    let convert (cst: TopLevel) : Ast.TopLevel<unit, unit, unit, unit> = topLevel cst
+    let convert (cst: TopLevel) : Ast.TopLevel<unit, unit, unit, unit, unit> = topLevel cst

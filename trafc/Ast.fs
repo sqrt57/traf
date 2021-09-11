@@ -19,41 +19,41 @@ module Ast =
     and OperatorCall<'expr> = { left: ExprAttr<'expr>; op: string; right: ExprAttr<'expr>; }
     and ExprAttr<'expr> = ExprAttr of expr: Expr<'expr> * attr: 'expr
 
-    type Type<'expr> =
+    type Type<'expr, 'typ> =
         | TypeRef of string
-        | Array of ArrayType<'expr>
-        | Pointer of Type<'expr>
-        | Fun of FunType<'expr>
-        | Tuple of TypeTuple<'expr>
-    and TypeTupleSlot<'expr> = { name: string option; type_: Type<'expr> }
-    and TypeTuple<'expr> = TypeTuple of TypeTupleSlot<'expr> list
-    and FunType<'expr> = { arguments: TypeTuple<'expr>; result: TypeTuple<'expr> }
-    and ArrayType<'expr> = { type_: Type<'expr>; size: ExprAttr<'expr> option }
+        | Array of ArrayType<'expr, 'typ>
+        | Pointer of Type<'expr, 'typ>
+        | Fun of FunType<'expr, 'typ>
+        | Tuple of TypeTuple<'expr, 'typ>
+    and TypeTupleSlot<'expr, 'typ> = { name: string option; type_: Type<'expr, 'typ> }
+    and TypeTuple<'expr, 'typ> = TypeTuple of TypeTupleSlot<'expr, 'typ> list
+    and FunType<'expr, 'typ> = { arguments: TypeTuple<'expr, 'typ>; result: TypeTuple<'expr, 'typ> }
+    and ArrayType<'expr, 'typ> = { type_: Type<'expr, 'typ>; size: ExprAttr<'expr> option }
 
-    type ConstDefinition<'itemAttr, 'expr> =
-        { name: string; type_: Type<'expr>; value: ExprAttr<'expr>; attr: 'itemAttr }
+    type ConstDefinition<'itemAttr, 'expr, 'typ> =
+        { name: string; type_: Type<'expr, 'typ>; value: ExprAttr<'expr>; attr: 'itemAttr }
 
-    type VarDefinition<'itemAttr, 'expr> =
-        { name: string; type_: Type<'expr>; value: ExprAttr<'expr> option; attr: 'itemAttr }
+    type VarDefinition<'itemAttr, 'expr, 'typ> =
+        { name: string; type_: Type<'expr, 'typ>; value: ExprAttr<'expr> option; attr: 'itemAttr }
 
     type Assignment<'itemAttr, 'expr> =
         { name: string; value: ExprAttr<'expr>;  attr: 'itemAttr }
 
-    type Statement<'stmt, 'expr> =
-        | ConstStatement of ConstDefinition<'stmt, 'expr>
-        | VarStatement of VarDefinition<'stmt, 'expr>
+    type Statement<'stmt, 'expr, 'typ> =
+        | ConstStatement of ConstDefinition<'stmt, 'expr, 'typ>
+        | VarStatement of VarDefinition<'stmt, 'expr, 'typ>
         | Assignment of Assignment<'stmt, 'expr>
         | Expression of expr: ExprAttr<'expr> * attr: 'stmt
 
-    type FunBody<'stmt, 'expr> =
-        FunBody of Statement<'stmt, 'expr> list
+    type FunBody<'stmt, 'expr, 'typ> =
+        FunBody of Statement<'stmt, 'expr, 'typ> list
 
     type FunAttrs = { entry: bool }
 
-    type FunDefinition<'def, 'stmt, 'expr> =
+    type FunDefinition<'def, 'stmt, 'expr, 'typ> =
         { name: string
-          type_: FunType<'expr>
-          body: FunBody<'stmt, 'expr>
+          type_: FunType<'expr, 'typ>
+          body: FunBody<'stmt, 'expr, 'typ>
           attrs: FunAttrs
           attr: 'def }
 
@@ -62,26 +62,26 @@ module Ast =
           dll_entry_point_name: string option
           dll_entry_point_ordinal: int64 option }
 
-    type ExternFunDefinition<'def, 'expr> =
+    type ExternFunDefinition<'def, 'expr, 'typ> =
         { name: string
-          type_: FunType<'expr>
+          type_: FunType<'expr, 'typ>
           attrs: ExternFunAttrs
           attr: 'def}
 
-    type ModuleItem<'def, 'stmt, 'expr> =
-        | ConstDefinition of ConstDefinition<'def, 'expr>
-        | VarDefinition of VarDefinition<'def, 'expr>
-        | FunDefinition of FunDefinition<'def, 'stmt, 'expr>
-        | ExternFunDefinition of ExternFunDefinition<'def, 'expr>
+    type ModuleItem<'def, 'stmt, 'expr, 'typ> =
+        | ConstDefinition of ConstDefinition<'def, 'expr, 'typ>
+        | VarDefinition of VarDefinition<'def, 'expr, 'typ>
+        | FunDefinition of FunDefinition<'def, 'stmt, 'expr, 'typ>
+        | ExternFunDefinition of ExternFunDefinition<'def, 'expr, 'typ>
 
-    type ModuleTopLevel<'def, 'stmt, 'expr> =
-        ModuleTopLevel of ModuleItem<'def, 'stmt, 'expr> list
+    type ModuleTopLevel<'def, 'stmt, 'expr, 'typ> =
+        ModuleTopLevel of ModuleItem<'def, 'stmt, 'expr, 'typ> list
 
-    type Module<'modul, 'def, 'stmt, 'expr> =
-        { name: string; definitions: ModuleTopLevel<'def, 'stmt, 'expr>; attr: 'modul }
+    type Module<'modul, 'def, 'stmt, 'expr, 'typ> =
+        { name: string; definitions: ModuleTopLevel<'def, 'stmt, 'expr, 'typ>; attr: 'modul }
 
-    type TopLevel<'modul, 'def, 'stmt, 'expr> =
-        TopLevel of Module<'modul, 'def, 'stmt, 'expr> list
+    type TopLevel<'modul, 'def, 'stmt, 'expr, 'typ> =
+        TopLevel of Module<'modul, 'def, 'stmt, 'expr, 'typ> list
 
 module AstCreate =
 
@@ -100,12 +100,16 @@ module AstCreate =
     let funCallExpr attr func args = ExprAttr(FunCall { func = func; arguments = args; }, attr)
     let operatorExpr attr left op right = ExprAttr(Operator { left = left; op = op; right = right; }, attr)
 
-    let refType name = TypeRef name
-    let arrayType typ size = Array { type_ = typ; size = size; }
-    let pointerType typ = Pointer typ
-    let argType name typ = { name = name; type_ = typ; }
-    let funDefType args result = { arguments = TypeTuple args; result = TypeTuple result }
-    let funType args result = Fun { arguments = TypeTuple args; result = TypeTuple result }
+    let refType attr name = TypeRef name
+    let arrayType attr typ size = Array { type_ = typ; size = size; }
+    let pointerType attr typ = Pointer typ
+    let private argType attr (name, typ) = { name = name; type_ = typ; }
+    let funType attr args result =
+        Fun { arguments = TypeTuple (List.map (argType attr) args)
+              result = TypeTuple (List.map (argType attr) result) }
+    let funDefType attr args result =
+        { arguments = TypeTuple (List.map (argType attr) args)
+          result = TypeTuple (List.map (argType attr) result) }
 
     let constStmt attr name typ value = ConstStatement { name = name; type_ = typ; value = value; attr = attr; }
     let varStmt attr name typ value = VarStatement { name = name; type_ = typ; value = value; attr = attr; }
@@ -125,6 +129,8 @@ module AstRead =
 
     open Ast
 
+    let typeAttr typ = raise (System.NotImplementedException())
+
     let exprAttr (ExprAttr (_, childAttr)) = childAttr
 
     let stmtAttr stmt =
@@ -141,7 +147,7 @@ module AstRead =
         | FunDefinition funDef -> funDef.attr
         | ExternFunDefinition externFunDef -> externFunDef.attr
 
-    let moduleAttr (modul: Module<'modul, 'def, 'stmt, 'expr>) = modul.attr
+    let moduleAttr (modul: Module<'modul, 'def, 'stmt, 'expr, 'typ>) = modul.attr
 
 module AstTransform =
 
@@ -149,9 +155,19 @@ module AstTransform =
     open AstCreate
     open AstRead
 
-    type IAstVisitor<'sourceModule, 'sourceDef, 'sourceStmt, 'sourceExpr, 
-                     'targetModule, 'targetDef, 'targetStmt, 'targetExpr,
-                     'topLevelContext, 'moduleContext, 'funContext, 'exprContext> =
+    type IAstVisitor<'sourceModule, 'sourceDef, 'sourceStmt, 'sourceExpr, 'sourceType,
+                     'targetModule, 'targetDef, 'targetStmt, 'targetExpr, 'targetType,
+                     'topLevelContext, 'moduleContext, 'funContext, 'exprContext, 'typeContext> =
+        // Type
+        abstract member typeRef: name: string -> context: 'typeContext -> source: 'sourceType -> 'targetType
+        abstract member typeArraySize: context: 'typeContext -> source: 'sourceType -> 'exprContext
+        abstract member typeArray: arg: 'targetType -> size: 'targetExpr option -> context: 'typeContext -> source: 'sourceType -> 'targetType
+        abstract member typePointer: arg: 'targetType -> context: 'typeContext -> source: 'sourceType -> 'targetType
+        abstract member typeFun: args: (string option * 'targetType) list -> result: (string option * 'targetType) list ->
+            context: 'typeContext -> source: 'sourceType -> 'targetType
+        abstract member typeFunDef: args: (string option * 'targetType) list -> result: (string option * 'targetType) list ->
+            context: 'typeContext -> source: 'sourceType -> 'targetType
+
         // Expression
         abstract member exprIntVal: value: int64 -> context: 'exprContext -> source: 'sourceExpr -> 'targetExpr
         abstract member exprCharVal: value: char -> context: 'exprContext -> source: 'sourceExpr -> 'targetExpr
@@ -180,11 +196,11 @@ module AstTransform =
 
         // Statement
         abstract member stmtConstValue: context: 'funContext -> source: 'sourceStmt -> 'exprContext
-        abstract member stmtConstType: context: 'funContext -> source: 'sourceStmt -> 'exprContext
+        abstract member stmtConstType: context: 'funContext -> source: 'sourceStmt -> 'typeContext
         abstract member stmtConst: name: string -> value: 'targetExpr -> context: 'funContext -> source: 'sourceStmt -> 'funContext * 'targetStmt
 
         abstract member stmtVarValue: context: 'funContext -> source: 'sourceStmt -> 'exprContext
-        abstract member stmtVarType: context: 'funContext -> source: 'sourceStmt -> 'exprContext
+        abstract member stmtVarType: context: 'funContext -> source: 'sourceStmt -> 'typeContext
         abstract member stmtVar: name: string -> value: 'targetExpr option -> context: 'funContext -> source: 'sourceStmt -> 'funContext * 'targetStmt
 
         abstract member stmtAssignValue: context: 'funContext -> source: 'sourceStmt -> 'exprContext
@@ -195,33 +211,33 @@ module AstTransform =
 
         // Definition
         abstract member defConstValue: context: 'moduleContext -> source: 'sourceDef -> 'exprContext
-        abstract member defConstType: context: 'moduleContext -> source: 'sourceDef -> 'exprContext
+        abstract member defConstType: context: 'moduleContext -> source: 'sourceDef -> 'typeContext
         abstract member defConst: name: string -> value: 'targetExpr -> context: 'moduleContext -> source: 'sourceDef -> 'moduleContext * 'targetDef
 
         abstract member defVarValue: context: 'moduleContext -> source: 'sourceDef -> 'exprContext
-        abstract member defVarType: context: 'moduleContext -> source: 'sourceDef -> 'exprContext
+        abstract member defVarType: context: 'moduleContext -> source: 'sourceDef -> 'typeContext
         abstract member defVar: name: string -> value: 'targetExpr option -> context: 'moduleContext -> source: 'sourceDef -> 'moduleContext * 'targetDef
 
         abstract member defFunBody: context: 'moduleContext -> source: 'sourceDef -> 'funContext
-        abstract member defFunType: context: 'moduleContext -> source: 'sourceDef -> 'exprContext
+        abstract member defFunType: context: 'moduleContext -> source: 'sourceDef -> 'typeContext
         abstract member defFun: name: string -> attrs: FunAttrs -> statements: 'targetStmt list -> context: 'moduleContext -> source: 'sourceDef -> 'moduleContext * 'targetDef
 
-        abstract member defExternFunType: context: 'moduleContext -> source: 'sourceDef -> 'exprContext
+        abstract member defExternFunType: context: 'moduleContext -> source: 'sourceDef -> 'typeContext
         abstract member defExternFun: name: string -> attrs: ExternFunAttrs -> context: 'moduleContext -> source: 'sourceDef -> 'moduleContext * 'targetDef
 
         // Module
         abstract member topModuleBody: context: 'topLevelContext -> source: 'sourceModule -> 'moduleContext
         abstract member topModule: name: string -> definitions: 'targetDef list -> context: 'topLevelContext -> source: 'sourceModule -> 'topLevelContext * 'targetModule
 
-    let visitAst<'sourceModule, 'sourceDef, 'sourceStmt, 'sourceExpr, 
-                 'targetModule, 'targetDef, 'targetStmt, 'targetExpr,
-                 'topLevelContext, 'moduleContext, 'funContext, 'exprContext>
-            (visitor: IAstVisitor<'sourceModule, 'sourceDef, 'sourceStmt, 'sourceExpr, 
-                                  'targetModule, 'targetDef, 'targetStmt, 'targetExpr,
-                                  'topLevelContext, 'moduleContext, 'funContext, 'exprContext>)
-            (ast: TopLevel<'sourceModule, 'sourceDef, 'sourceStmt, 'sourceExpr>)
+    let visitAst<'sourceModule, 'sourceDef, 'sourceStmt, 'sourceExpr, 'sourceType,
+                 'targetModule, 'targetDef, 'targetStmt, 'targetExpr, 'targetType,
+                 'topLevelContext, 'moduleContext, 'funContext, 'exprContext, 'typeContext>
+            (visitor: IAstVisitor<'sourceModule, 'sourceDef, 'sourceStmt, 'sourceExpr, 'sourceType,
+                                  'targetModule, 'targetDef, 'targetStmt, 'targetExpr, 'targetType,
+                                  'topLevelContext, 'moduleContext, 'funContext, 'exprContext, 'typeContext>)
+            (ast: TopLevel<'sourceModule, 'sourceDef, 'sourceStmt, 'sourceExpr, 'sourceType>)
             (context: 'topLevelContext)
-            : 'topLevelContext * TopLevel<'targetModule, 'targetDef, 'targetStmt, 'targetExpr> =
+            : 'topLevelContext * TopLevel<'targetModule, 'targetDef, 'targetStmt, 'targetExpr, 'targetType> =
 
         let rec toExpr context (ExprAttr (expr, source)) =
             match expr with
@@ -258,34 +274,62 @@ module AstTransform =
                 let right = toExpr childContext right
                 operatorExpr (visitor.exprOperator (exprAttr left) op (exprAttr right) context source) left op right
 
+        let fromTypeArg ({ name = name; type_ = type_ }: TypeTupleSlot<'sourceExpr, 'sourceType>) = (name, type_)
+        let fromTypeTuple (TypeTuple tt) = List.map fromTypeArg tt
+
+        let mapTypeArg f (name, t) = (name, f t)
+        let mapTypeTuple f tt = List.map (mapTypeArg f) tt
+
         let rec toType context typ =
+            let source = typeAttr typ
             match typ with
-            | TypeRef r -> TypeRef r
-            | Array { type_ = type_; size = size } ->
-                Array { type_ = toType context type_; size = Option.map (toExpr context) size }
-            | Pointer t -> Pointer (toType context t)
-            | Fun t -> Fun (toFunType context t)
-            | Tuple tt -> Tuple (toTypeTuple context tt)
-        and toFunType context { arguments = arguments; result = result } =
-            { arguments = toTypeTuple context arguments; result = toTypeTuple context result }
-        and toTypeTuple context (TypeTuple t) = TypeTuple (List.map (toTypeTupleSlot context) t)
-        and toTypeTupleSlot context ({ name = name; type_ = type_ }: TypeTupleSlot<'sourceExpr>) =
-            { name = name; type_ = toType context type_ }
+            | TypeRef r ->
+                let target = visitor.typeRef r context source
+                refType target r 
+            | Array { type_ = typ; size = size } ->
+                let exprContext = visitor.typeArraySize context (typeAttr typ)
+                let typ = toType context typ
+                let size = Option.map (toExpr exprContext) size
+                let target = visitor.typeArray (typeAttr typ) (Option.map exprAttr size) context source
+                arrayType target typ size
+            | Pointer typ ->
+                let typ = toType context typ
+                let target = visitor.typePointer (typeAttr typ) context source
+                pointerType target typ
+            | Fun { arguments = args; result = result; } ->
+                let args = mapTypeTuple (toType context) (fromTypeTuple args)
+                let result = mapTypeTuple (toType context) (fromTypeTuple result)
+                let argsAttr = mapTypeTuple typeAttr args
+                let resultAttr = mapTypeTuple typeAttr result
+                let target = visitor.typeFun argsAttr resultAttr context source
+                funType target args result
+            | Tuple tt -> raise (System.InvalidOperationException())
+
+        let toFunType context { arguments = args; result = result; } =
+            let args = mapTypeTuple (toType context) (fromTypeTuple args)
+            let result = mapTypeTuple (toType context) (fromTypeTuple result)
+            let argsAttr = mapTypeTuple typeAttr args
+            let resultAttr = mapTypeTuple typeAttr result
+            let source = raise (System.NotImplementedException())
+            let target = visitor.typeFunDef argsAttr resultAttr context source
+            funDefType target args result
 
         let toStatement (context, acc) statement =
             match statement with
             | ConstStatement { name = name; type_ = type_; value = value; attr = attr; } ->
                 let childContext = visitor.stmtConstValue context attr
+                let typeContext = visitor.stmtConstType context attr
                 let value = toExpr childContext value
                 let childAttr = exprAttr value
                 let (context, expr) = visitor.stmtConst name childAttr context attr
-                (context, constStmt expr name (toType childContext type_) value :: acc)
+                (context, constStmt expr name (toType typeContext type_) value :: acc)
             | VarStatement { name = name; type_ = type_; value = value; attr = attr; } ->
                 let childContext = visitor.stmtVarValue context attr
+                let typeContext = visitor.stmtVarType context attr
                 let value = Option.map (toExpr childContext) value
                 let childAttr = Option.map exprAttr value
                 let (context, expr) = visitor.stmtVar name childAttr context attr
-                (context, varStmt expr name (toType childContext type_) value :: acc)
+                (context, varStmt expr name (toType typeContext type_) value :: acc)
             | Assignment { name = name; value = value; attr = attr; } ->
                 let childContext = visitor.stmtAssignValue context attr
                 let value = toExpr childContext value
@@ -324,7 +368,7 @@ module AstTransform =
                 let (context, target) = visitor.defFun name attrs childAttrs context source
                 (context, funDef target name attrs (toFunType typeContext type_) statements :: acc)
             | ExternFunDefinition { name = name; type_ = type_; attrs = attrs; attr = source } ->
-                let typeContext = visitor.defFunType context source
+                let typeContext = visitor.defExternFunType context source
                 let (context, target) = visitor.defExternFun name attrs context source
                 (context, externFunDef target name attrs (toFunType typeContext type_) :: acc)
 

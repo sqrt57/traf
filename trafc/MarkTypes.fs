@@ -7,10 +7,19 @@ module MarkTypes =
     open LangType
     open Context
 
-    type AstWithTypes = Ast.TopLevel<unit, unit, unit, Type>
+    type AstWithTypes = Ast.TopLevel<unit, unit, unit, Type, int>
 
     let markTypesVisitor =
-        { new IAstVisitor<unit, unit, unit, unit, unit, unit, unit, Type, Context, Context, Context, Context> with
+        { new IAstVisitor<unit, unit, unit, unit, unit,
+                          unit, unit, unit, Type, int,
+                          Context, Context, Context, Context, Context> with
+            member this.typeRef name context source = 0
+            member this.typeArraySize context source = context
+            member this.typeArray arg size context source = 0
+            member this.typePointer arg context source = 0
+            member this.typeFun args result context source = 0
+            member this.typeFunDef args result context source = 0
+
             member this.exprIntVal value context source = Int
             member this.exprCharVal value context source = Char
             member this.exprBoolVal value context source = Bool
