@@ -2,7 +2,7 @@ namespace Triton
 
 module AstConvert =
 
-    open Error
+    open Errors
     open Cst
     open AstCreate
 

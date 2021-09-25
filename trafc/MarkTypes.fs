@@ -3,7 +3,7 @@ namespace Triton
 module Context =
 
     open ContextType
-    open Error
+    open Errors
 
     let emptyFrame = { bindings = Map.empty }
     let emptyTypeFrame = { typeBindings = Map.empty }
@@ -48,7 +48,7 @@ module Context =
 
 module MarkTypes =
 
-    open Error
+    open Errors
     open AstTransform
     open LangType
     open ContextType

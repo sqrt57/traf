@@ -4,7 +4,7 @@ open Xunit
 open Swensen.Unquote
 
 open Triton
-open Triton.Error
+open Triton.Errors
 
 [<Fact>]
 let ``Lex empty string`` () =

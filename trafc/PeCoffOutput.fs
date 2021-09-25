@@ -155,7 +155,7 @@ module PeCoffWrite =
 
     open System
 
-    open Error
+    open Errors
     open PeCoff
 
     let writeUint8 (image: byte array) (offset: int) (i: uint8) =

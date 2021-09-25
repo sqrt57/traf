@@ -135,7 +135,7 @@ module Parse =
 
 module CstParse =
 
-    open Error
+    open Errors
     open Lexeme
     open Parse
 

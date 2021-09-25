@@ -6,7 +6,7 @@ module Lex =
     open System.Text
     open System.Collections.Generic
 
-    open Error
+    open Errors
     open Lexeme
 
     let private isIdentStart (c : char) = Char.IsLetter c || c = '_'

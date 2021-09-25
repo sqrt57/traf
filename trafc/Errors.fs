@@ -1,6 +1,6 @@
 namespace Triton
 
-module Error =
+module Errors =
 
     exception LexerError of {| message: string |}
 

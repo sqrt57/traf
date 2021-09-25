@@ -2,7 +2,7 @@ namespace Triton
 
 module Trafc =
 
-    open Error
+    open Errors
     open Drive
 
     let parseCmdLine (argv : string list) : Config =
