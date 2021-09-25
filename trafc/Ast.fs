@@ -207,11 +207,11 @@ module AstTransform =
         // Statement
         abstract member stmtConstValue: context: 'funContext -> source: 'sourceStmt -> 'exprContext
         abstract member stmtConstType: context: 'funContext -> source: 'sourceStmt -> 'typeContext
-        abstract member stmtConst: name: string -> value: 'targetExpr -> context: 'funContext -> source: 'sourceStmt -> 'funContext * 'targetStmt
+        abstract member stmtConst: name: string -> type_: 'targetType -> value: 'targetExpr -> context: 'funContext -> source: 'sourceStmt -> 'funContext * 'targetStmt
 
         abstract member stmtVarValue: context: 'funContext -> source: 'sourceStmt -> 'exprContext
         abstract member stmtVarType: context: 'funContext -> source: 'sourceStmt -> 'typeContext
-        abstract member stmtVar: name: string -> value: 'targetExpr option -> context: 'funContext -> source: 'sourceStmt -> 'funContext * 'targetStmt
+        abstract member stmtVar: name: string -> type_: 'targetType -> value: 'targetExpr option -> context: 'funContext -> source: 'sourceStmt -> 'funContext * 'targetStmt
 
         abstract member stmtAssignValue: context: 'funContext -> source: 'sourceStmt -> 'exprContext
         abstract member stmtAssign: name: string -> value: 'targetExpr -> context: 'funContext -> source: 'sourceStmt -> 'funContext * 'targetStmt
@@ -222,18 +222,18 @@ module AstTransform =
         // Definition
         abstract member defConstValue: context: 'moduleContext -> source: 'sourceDef -> 'exprContext
         abstract member defConstType: context: 'moduleContext -> source: 'sourceDef -> 'typeContext
-        abstract member defConst: name: string -> value: 'targetExpr -> context: 'moduleContext -> source: 'sourceDef -> 'moduleContext * 'targetDef
+        abstract member defConst: name: string -> type_: 'targetType -> value: 'targetExpr -> context: 'moduleContext -> source: 'sourceDef -> 'moduleContext * 'targetDef
 
         abstract member defVarValue: context: 'moduleContext -> source: 'sourceDef -> 'exprContext
         abstract member defVarType: context: 'moduleContext -> source: 'sourceDef -> 'typeContext
-        abstract member defVar: name: string -> value: 'targetExpr option -> context: 'moduleContext -> source: 'sourceDef -> 'moduleContext * 'targetDef
+        abstract member defVar: name: string -> type_: 'targetType -> value: 'targetExpr option -> context: 'moduleContext -> source: 'sourceDef -> 'moduleContext * 'targetDef
 
         abstract member defFunBody: context: 'moduleContext -> source: 'sourceDef -> 'funContext
         abstract member defFunType: context: 'moduleContext -> source: 'sourceDef -> 'typeContext
-        abstract member defFun: name: string -> attrs: FunAttrs -> statements: 'targetStmt list -> context: 'moduleContext -> source: 'sourceDef -> 'moduleContext * 'targetDef
+        abstract member defFun: name: string -> type_: 'targetType -> attrs: FunAttrs -> statements: 'targetStmt list -> context: 'moduleContext -> source: 'sourceDef -> 'moduleContext * 'targetDef
 
         abstract member defExternFunType: context: 'moduleContext -> source: 'sourceDef -> 'typeContext
-        abstract member defExternFun: name: string -> attrs: ExternFunAttrs -> context: 'moduleContext -> source: 'sourceDef -> 'moduleContext * 'targetDef
+        abstract member defExternFun: name: string -> type_: 'targetType -> attrs: ExternFunAttrs -> context: 'moduleContext -> source: 'sourceDef -> 'moduleContext * 'targetDef
 
         // Module
         abstract member topModuleBody: context: 'topLevelContext -> source: 'sourceModule -> 'moduleContext
@@ -330,17 +330,21 @@ module AstTransform =
             | ConstStatement { name = name; type_ = type_; value = value; attr = attr; } ->
                 let childContext = visitor.stmtConstValue context attr
                 let typeContext = visitor.stmtConstType context attr
+                let type_ = toType typeContext type_
+                let typeAttr = typeAttr type_
                 let value = toExpr childContext value
                 let childAttr = exprAttr value
-                let (context, expr) = visitor.stmtConst name childAttr context attr
-                (context, constStmt expr name (toType typeContext type_) value :: acc)
+                let (context, expr) = visitor.stmtConst name typeAttr childAttr context attr
+                (context, constStmt expr name type_ value :: acc)
             | VarStatement { name = name; type_ = type_; value = value; attr = attr; } ->
                 let childContext = visitor.stmtVarValue context attr
                 let typeContext = visitor.stmtVarType context attr
+                let type_ = toType typeContext type_
+                let typeAttr = typeAttr type_
                 let value = Option.map (toExpr childContext) value
                 let childAttr = Option.map exprAttr value
-                let (context, expr) = visitor.stmtVar name childAttr context attr
-                (context, varStmt expr name (toType typeContext type_) value :: acc)
+                let (context, expr) = visitor.stmtVar name typeAttr childAttr context attr
+                (context, varStmt expr name type_ value :: acc)
             | Assignment { name = name; value = value; attr = attr; } ->
                 let childContext = visitor.stmtAssignValue context attr
                 let value = toExpr childContext value
@@ -360,28 +364,36 @@ module AstTransform =
                 let valueContext = visitor.defConstValue context source
                 let typeContext = visitor.defConstType context source
                 let value = toExpr valueContext value
+                let type_ = toType typeContext type_
+                let typeAttr = typeAttr type_
                 let childAttr = exprAttr value
-                let (context, target) = visitor.defConst name childAttr context source
-                (context, constDef target name (toType typeContext type_) value :: acc)
+                let (context, target) = visitor.defConst name typeAttr childAttr context source
+                (context, constDef target name type_ value :: acc)
             | VarDefinition { name = name; type_ = type_; value = value; attr = source } ->
                 let valueContext = visitor.defVarValue context source
                 let typeContext = visitor.defVarType context source
                 let value = Option.map (toExpr valueContext) value
+                let type_ = toType typeContext type_
                 let childAttr = Option.map exprAttr value
-                let (context, target) = visitor.defVar name childAttr context source
-                (context, varDef target name (toType typeContext type_) value :: acc)
+                let typeAttr = typeAttr type_
+                let (context, target) = visitor.defVar name typeAttr childAttr context source
+                (context, varDef target name type_ value :: acc)
             | FunDefinition { name = name; type_ = type_; body = FunBody statements; attrs = attrs; attr = source; } ->
                 let bodyContext = visitor.defFunBody context source
                 let typeContext = visitor.defFunType context source
+                let type_ = toFunType typeContext type_
+                let typeAttr = funTypeAttr type_
                 let (bodyContext, statementsRev) = List.fold toStatement (bodyContext, []) statements
                 let statements = List.rev statementsRev
                 let childAttrs = List.map stmtAttr statements
-                let (context, target) = visitor.defFun name attrs childAttrs context source
-                (context, funDef target name attrs (toFunType typeContext type_) statements :: acc)
+                let (context, target) = visitor.defFun name typeAttr attrs childAttrs context source
+                (context, funDef target name attrs type_ statements :: acc)
             | ExternFunDefinition { name = name; type_ = type_; attrs = attrs; attr = source } ->
                 let typeContext = visitor.defExternFunType context source
-                let (context, target) = visitor.defExternFun name attrs context source
-                (context, externFunDef target name attrs (toFunType typeContext type_) :: acc)
+                let type_ = toFunType typeContext type_
+                let typeAttr = funTypeAttr type_
+                let (context, target) = visitor.defExternFun name typeAttr attrs context source
+                (context, externFunDef target name attrs type_ :: acc)
 
         let toModule (context, acc) srcModule =
             let childContext = visitor.topModuleBody context srcModule.attr

@@ -94,6 +94,6 @@ module Trafc =
             | AstConvertError err ->
                 eprintfn "Error while converting CST to AST: %s" err.message
                 1
-            | TypeError err ->
-                eprintfn "Error while marking types: %s" err.message
+            | TypeError (message = message) ->
+                eprintfn "Error while marking types: %s" message
                 1

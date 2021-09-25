@@ -16,7 +16,7 @@ module Error =
 
     exception AstConvertError of {| message: string |}
 
-    exception TypeError of {| message: string |}
+    exception TypeError of message: string
 
     exception ExeOutputError of {| message: string |}
 

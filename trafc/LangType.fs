@@ -5,14 +5,19 @@ module LangType =
     type Type =
         | NoneType
         | Bool
-        | Int
-        | Char
+        | UInt8
+        | UInt16
+        | UInt32
+        | Int8
+        | Int16
+        | Int32
+        | SomeInt
         | ByteString
         | Pointer
         | PointerTo of Type
         | Array of typ: Type * size: int option
 
-module Context =
+module ContextType =
 
     type SymbolClass =
         | Variable
@@ -20,9 +25,25 @@ module Context =
         | Function
 
     type SymbolInfo =
-        SymbolInfo of
-            name: string *
-            symbolClass: SymbolClass *
-            symbolType: LangType.Type
+        { name: string
+          symbolClass: SymbolClass
+          symbolType: LangType.Type
+        }
 
-    type Context = Context of Map<string, SymbolInfo>
+    type ContextFrame =
+        { bindings: Map<string, SymbolInfo>
+        }
+
+    type TypeInfo =
+        { typeName: string
+          type_: LangType.Type
+        }
+
+    type TypeContextFrame =
+        { typeBindings: Map<string, TypeInfo>
+        }
+
+    type Context =
+        { frames: ContextFrame list
+          typeFrames: TypeContextFrame list
+        }
