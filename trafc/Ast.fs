@@ -103,14 +103,14 @@ module AstCreate =
     let refType attr name = TypeRef (attr = attr, name = name)
     let arrayType attr typ size = Array { type_ = typ; size = size; attr = attr }
     let pointerType attr typ = Pointer (attr = attr, typ = typ)
-    let private argType attr (name, typ) = { name = name; type_ = typ; }
+    let private argType (name, typ) = { name = name; type_ = typ; }
     let funType attr args result =
-        Fun { arguments = TypeTuple (List.map (argType attr) args)
-              result = TypeTuple (List.map (argType attr) result)
+        Fun { arguments = TypeTuple (List.map argType args)
+              result = TypeTuple (List.map argType result)
               attr = attr }
     let funDefType attr args result =
-        { arguments = TypeTuple (List.map (argType attr) args)
-          result = TypeTuple (List.map (argType attr) result)
+        { arguments = TypeTuple (List.map argType args)
+          result = TypeTuple (List.map argType result)
           attr = attr }
 
     let constStmt attr name typ value = ConstStatement { name = name; type_ = typ; value = value; attr = attr; }
