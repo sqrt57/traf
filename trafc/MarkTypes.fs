@@ -65,8 +65,8 @@ module MarkTypes =
             member this.typeArraySize context source = context
             member this.typeArray arg size context source = Array (typ = arg, size = None)
             member this.typePointer arg context source = PointerTo arg
-            member this.typeFun args result context source = NoneType
-            member this.typeFunDef args result context source = NoneType
+            member this.typeFun args result context source = Fun (args = Tuple args, result = Tuple result)
+            member this.typeFunDef args result context source = Fun (args = Tuple args, result = Tuple result)
 
             member this.exprIntVal value context source = SomeInt
             member this.exprCharVal value context source = UInt8
@@ -97,7 +97,10 @@ module MarkTypes =
                 | _ -> raise (TypeError (message = "Unary negation can be only applied to integers"))
 
             member this.exprFunCallChild context source = context
-            member this.exprFunCall func args context source = NoneType
+            member this.exprFunCall func args context source =
+                match func with
+                | Fun (args = args; result = result) -> result
+                | _ -> raise (TypeError (message = "Unary negation can be only applied to integers"))
 
             member this.exprOperatorChild context source = context
             member this.exprOperator left op right context source = NoneType

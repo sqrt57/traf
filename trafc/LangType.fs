@@ -16,6 +16,8 @@ module LangType =
         | Pointer
         | PointerTo of Type
         | Array of typ: Type * size: int option
+        | Tuple of (string option * Type) list
+        | Fun of args: Type * result: Type
 
 module ContextType =
 
