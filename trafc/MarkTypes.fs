@@ -54,31 +54,38 @@ module MarkTypes =
     open ContextType
     open Context
 
-    type AstWithTypes = Ast.TopLevel<unit, unit, unit, Type, Type>
+    type AstWithTypes = Ast.TopLevel<unit, unit, unit, Type * Value, Type>
 
     let markTypesVisitor =
         { new IAstVisitor<unit, unit, unit, unit, unit,
-                          unit, unit, unit, Type, Type,
+                          unit, unit, unit, Type * Value, Type,
                           Context, Context, Context, Context, Context> with
 
             member this.typeRef name context source = (getTypeBinding context name).type_
             member this.typeArraySize context source = context
-            member this.typeArray arg size context source = Array (typ = arg, size = None)
+            member this.typeArray arg size context source =
+                match size with
+                | None -> Array (typ = arg, size = None)
+                | Some (_, IntVal value) -> Array (typ = arg, size = Some (int value))
+                | _ -> raise (TypeError "Array size should be an integer constant")
             member this.typePointer arg context source = PointerTo arg
             member this.typeFun args result context source = Fun (args = Tuple args, result = Tuple result)
             member this.typeFunDef args result context source = Fun (args = Tuple args, result = Tuple result)
 
-            member this.exprIntVal value context source = SomeInt
-            member this.exprCharVal value context source = UInt8
-            member this.exprBoolVal value context source = Bool
-            member this.exprStringVal value context source = ByteString
-            member this.exprReference name context source = (getBinding context name).symbolType
-            member this.exprNull context source = Pointer
+            member this.exprIntVal value context source = (SomeInt, IntVal value)
+            member this.exprCharVal value context source = (UInt8, NoVal)
+            member this.exprBoolVal value context source = (Bool, BoolVal value)
+            member this.exprStringVal value context source = (ByteString, ByteStringVal value)
+            member this.exprReference name context source =
+                let symbolInfo = getBinding context name
+                (symbolInfo.symbolType, symbolInfo.value)
+            member this.exprNull context source = (Pointer, NoVal)
 
             member this.exprLengthChild context source = context
             member this.exprLength arg context source =
                 match arg with
-                | ByteString -> SomeInt
+                | (ByteString, ByteStringVal value) -> (SomeInt, value |> String.length |> int64 |> IntVal)
+                | (ByteString, _) -> (SomeInt, NoVal)
                 | _ -> raise (TypeError (message = "Length argument should be bytestring"))
 
             member this.exprSizeOfChild context source = context
@@ -87,36 +94,37 @@ module MarkTypes =
             member this.exprAddressOfChild context source = context
             member this.exprAddressOf arg context source =
                 match arg with
-                | ByteString -> PointerTo UInt8
-                | t -> PointerTo t
+                | (ByteString, _) -> (PointerTo UInt8, NoVal)
+                | (t, _) -> (PointerTo t, NoVal)
 
             member this.exprNegateChild context source = context
             member this.exprNegate arg context source =
                 match arg with
-                | SomeInt -> SomeInt
+                | (SomeInt, IntVal value) -> (SomeInt, IntVal (-value))
+                | (SomeInt, _) -> (SomeInt, NoVal)
                 | _ -> raise (TypeError (message = "Unary negation can be only applied to integers"))
 
             member this.exprFunCallChild context source = context
             member this.exprFunCall func args context source =
                 match func with
-                | Fun (args = args; result = result) -> result
+                | (Fun (args = args; result = result), _) -> (result, NoVal)
                 | _ -> raise (TypeError (message = "Unary negation can be only applied to integers"))
 
             member this.exprOperatorChild context source = context
-            member this.exprOperator left op right context source = NoneType
+            member this.exprOperator left op right context source = raise (System.NotImplementedException())
 
             // Statement
             member this.stmtConstValue context source = context
             member this.stmtConstType context source = context
-            member this.stmtConst name type_ value context source =
-                let symbolInfo = { name = name; symbolClass = SymbolClass.Constant; symbolType = type_ }
+            member this.stmtConst name type_ ((valueType, value)) context source =
+                let symbolInfo = { name = name; symbolClass = SymbolClass.Constant; symbolType = type_; value = value }
                 let context = addBinding symbolInfo context
                 (context, ())
 
             member this.stmtVarValue context source = context
             member this.stmtVarType context source = context
             member this.stmtVar name type_ value context source =
-                let symbolInfo = { name = name; symbolClass = SymbolClass.Variable; symbolType = type_ }
+                let symbolInfo = { name = name; symbolClass = SymbolClass.Variable; symbolType = type_; value = NoVal }
                 let context = addBinding symbolInfo context
                 (context, ())
 
@@ -129,28 +137,28 @@ module MarkTypes =
             // Definition
             member this.defConstValue context source = context
             member this.defConstType context source = context
-            member this.defConst name type_ value context source =
-                let symbolInfo = { name = name; symbolClass = SymbolClass.Constant; symbolType = type_ }
+            member this.defConst name type_ ((valueType, value)) context source =
+                let symbolInfo = { name = name; symbolClass = SymbolClass.Constant; symbolType = type_; value = value }
                 let context = addBinding symbolInfo context
                 (context, ())
 
             member this.defVarValue context source = context
             member this.defVarType context source = context
             member this.defVar name type_ value context source =
-                let symbolInfo = { name = name; symbolClass = SymbolClass.Variable; symbolType = type_ }
+                let symbolInfo = { name = name; symbolClass = SymbolClass.Variable; symbolType = type_; value = NoVal }
                 let context = addBinding symbolInfo context
                 (context, ())
 
             member this.defFunBody context source = context |> pushEmptyFrame
             member this.defFunType context source = context
             member this.defFun name type_ attrs statements context source =
-                let symbolInfo = { name = name; symbolClass = SymbolClass.Function; symbolType = type_ }
+                let symbolInfo = { name = name; symbolClass = SymbolClass.Function; symbolType = type_; value = NoVal }
                 let context = addBinding symbolInfo context
                 (context, ())
 
             member this.defExternFunType context source = context
             member this.defExternFun name type_ attrs context source =
-                let symbolInfo = { name = name; symbolClass = SymbolClass.Function; symbolType = type_ }
+                let symbolInfo = { name = name; symbolClass = SymbolClass.Function; symbolType = type_; value = NoVal }
                 let context = addBinding symbolInfo context
                 (context, ())
 
@@ -171,7 +179,7 @@ module MarkTypes =
         |> addTypeBinding { typeName = "bool"; type_ = Type.Bool }
         |> addTypeBinding { typeName = "pointer"; type_ = Type.Pointer }
         |> addTypeBinding { typeName = "bytestring"; type_ = Type.ByteString }
-        |> addBinding { name = "null"; symbolClass = SymbolClass.Constant; symbolType = Type.Pointer }
+        |> addBinding { name = "null"; symbolClass = SymbolClass.Constant; symbolType = Type.Pointer; value = NoVal }
 
     let markTypes ast =
         let context = addBuiltins initialContext

@@ -3,7 +3,7 @@ namespace Triton
 module LangType =
 
     type Type =
-        | NoneType
+        | NoType
         | Bool
         | UInt8
         | UInt16
@@ -19,6 +19,12 @@ module LangType =
         | Tuple of (string option * Type) list
         | Fun of args: Type * result: Type
 
+    type Value =
+        | NoVal
+        | BoolVal of bool
+        | IntVal of int64
+        | ByteStringVal of string
+
 module ContextType =
 
     type SymbolClass =
@@ -30,6 +36,7 @@ module ContextType =
         { name: string
           symbolClass: SymbolClass
           symbolType: LangType.Type
+          value: LangType.Value
         }
 
     type ContextFrame =
