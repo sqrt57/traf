@@ -13,6 +13,7 @@ module LangType =
         | Int32
         | SomeInt
         | ByteString
+        | AnyPointer
         | Pointer
         | PointerTo of Type
         | Array of typ: Type * size: int option

@@ -14,8 +14,7 @@ module AstConvert =
         | CharVal c -> charExpr () c
         | BoolVal b -> boolExpr () b
         | StringVal s -> stringExpr () s
-        | Ref r -> refExpr () r
-        | Null -> nullExpr ()
+        | Ref r -> if r = "null" then nullExpr () else refExpr () r
         | AddressOf arg -> addressOfExpr () (toExpr arg)
         | Negate arg -> negateExpr () (toExpr arg)
         | FunCall { func = Ref "length"; arguments = [arg] } ->

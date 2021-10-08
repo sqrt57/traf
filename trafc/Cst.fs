@@ -8,7 +8,6 @@ module Cst =
         | BoolVal of bool
         | StringVal of string
         | Ref of string
-        | Null
         | AddressOf of Expr
         | Negate of Expr
         | FunCall of FunCall
