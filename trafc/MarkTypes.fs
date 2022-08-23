@@ -54,13 +54,11 @@ module MarkTypes =
     open ContextType
     open Context
 
-    type AstWithTypes = Ast.TopLevel<unit, unit, unit, Type * Value, Type>
-
     let getAssignmentValueType t =
         match t with
         | Tuple [(_, t)] -> t
-        | Tuple [] -> raise (TypeError (message = "value has unit type, it cannot be assigned to varible"))
-        | Tuple _ -> raise (TypeError (message = "value has tuple type, it cannot be assigned to varible"))
+        | Tuple [] -> raise (TypeError (message = "value has unit type, it cannot be assigned to variable"))
+        | Tuple _ -> raise (TypeError (message = "value has tuple type, it cannot be assigned to variable"))
         | t -> t
 
     let isTypeAssignable source target =
@@ -69,7 +67,6 @@ module MarkTypes =
         | (AnyPointer, Pointer) -> true
         | (AnyPointer, PointerTo _) -> true
         | (SomeInt, Int32) -> true
-        | (SomeInt, UInt32) -> true
         | (SomeInt, UInt32) -> true
         | _ -> false
 
@@ -157,7 +154,7 @@ module MarkTypes =
             member this.stmtVarType context source = context
             member this.stmtVar name type_ value context source =
                 match value with
-                | Some (valueType, value) -> 
+                | Some (valueType, value) ->
                     let valueType = getAssignmentValueType valueType
                     if not (isTypeAssignable valueType type_) then
                         raise (TypeError (message = $"Variable {name} has type {valueType}, cannot assign value of type {type_} to it"))
@@ -196,7 +193,7 @@ module MarkTypes =
             member this.defVarType context source = context
             member this.defVar name type_ value context source =
                 match value with
-                | Some (valueType, value) -> 
+                | Some (valueType, value) ->
                     let valueType = getAssignmentValueType valueType
                     if not (isTypeAssignable valueType type_) then
                         raise (TypeError (message = $"Variable {name} has type {valueType}, cannot assign value of type {type_} to it"))

@@ -10,6 +10,7 @@
     <Compile Include="Cst.fs" />
     <Compile Include="Ast.fs" />
     <Compile Include="LangType.fs" />
+    <Compile Include="CodeTree.fs" />
     <Compile Include="PeCoff.fs" />
     <Compile Include="Errors.fs" />
     <Compile Include="Lex.fs" />

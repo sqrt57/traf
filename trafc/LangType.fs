@@ -26,6 +26,9 @@ module LangType =
         | IntVal of int64
         | ByteStringVal of string
 
+    type AstWithTypes = Ast.TopLevel<unit, unit, unit, Type * Value, Type>
+
+
 module ContextType =
 
     type SymbolClass =

@@ -14,6 +14,7 @@ module Trafc =
             cstOutput = None
             astOutput = None
             astWithTypesOutput = None
+            codeTreeOutput = None
             verbose = Verbosity.Normal }
 
         let rec parse (argv: string list) (config: Config) =
@@ -22,38 +23,45 @@ module Trafc =
             | "-o" :: rest ->
                 match rest with
                 | [] -> raise (CommandLineParserError "output file name expected after '-o'")
-                | fileName :: rest -> 
+                | fileName :: rest ->
                     match config.exeOutput with
                     | Some _ -> raise (CommandLineParserError "multiple output files specified")
                     | None ->  parse rest { config with exeOutput = Some fileName }
             | "--lexer" :: rest ->
                 match rest with
                 | [] -> raise (CommandLineParserError "lexer output file name expected after '--cst'")
-                | fileName :: rest -> 
+                | fileName :: rest ->
                     match config.lexerOutput with
                     | Some _ -> raise (CommandLineParserError "multiple lexer output files specified")
                     | None ->  parse rest { config with lexerOutput = Some fileName }
             | "--cst" :: rest ->
                 match rest with
                 | [] -> raise (CommandLineParserError "CST output file name expected after '--cst'")
-                | fileName :: rest -> 
+                | fileName :: rest ->
                     match config.cstOutput with
                     | Some _ -> raise (CommandLineParserError "multiple CST output files specified")
                     | None ->  parse rest { config with cstOutput = Some fileName }
             | "--ast" :: rest ->
                 match rest with
                 | [] -> raise (CommandLineParserError "AST output file name expected after '--ast'")
-                | fileName :: rest -> 
+                | fileName :: rest ->
                     match config.astOutput with
                     | Some _ -> raise (CommandLineParserError "multiple AST output files specified")
                     | None ->  parse rest { config with astOutput = Some fileName }
             | "--ast-types" :: rest ->
                 match rest with
                 | [] -> raise (CommandLineParserError "AST with types output file name expected after '--ast-types'")
-                | fileName :: rest -> 
+                | fileName :: rest ->
                     match config.astWithTypesOutput with
                     | Some _ -> raise (CommandLineParserError "multiple AST with types output files specified")
                     | None ->  parse rest { config with astWithTypesOutput = Some fileName }
+            | "--code-tree" :: rest ->
+                match rest with
+                | [] -> raise (CommandLineParserError "Code tree file name expected after '--code-tree'")
+                | fileName :: rest ->
+                    match config.codeTreeOutput with
+                    | Some _ -> raise (CommandLineParserError "multiple code tree output files specified")
+                    | None ->  parse rest { config with codeTreeOutput = Some fileName }
             | x :: _ when x.StartsWith("-") -> raise (CommandLineParserError <| sprintf "unknown option '%s'" x)
             | fileName :: rest -> parse rest { config with inputs = fileName :: config.inputs }
 

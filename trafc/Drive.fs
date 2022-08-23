@@ -1,5 +1,7 @@
 namespace Triton
 
+open System.Collections.Immutable
+
 module Drive =
 
     open System.IO
@@ -15,6 +17,7 @@ module Drive =
           cstOutput: string option
           astOutput: string option
           astWithTypesOutput: string option
+          codeTreeOutput: string option
           verbose: Verbosity }
 
     type CompiledModule =
@@ -23,7 +26,7 @@ module Drive =
           lexemes: Lexeme.Lexeme list
           cst: Cst.TopLevel
           ast: AstConvert.AstEmpty
-          astWithTypes: MarkTypes.AstWithTypes }
+          astWithTypes: LangType.AstWithTypes }
 
     let compileModule fileName =
 
@@ -43,7 +46,7 @@ module Drive =
     let writeLexerOutput (fileName: string) (modules: CompiledModule seq) =
         use writer = new StreamWriter(fileName)
         for m in modules do
-            fprintfn writer "Lex result for %s:" fileName
+            fprintfn writer "Lex result for %s:" m.fileName
             for lexeme in m.lexemes do
                 fprintfn writer "%A" lexeme
             fprintfn writer ""
@@ -51,27 +54,34 @@ module Drive =
     let writeCstOutput (fileName: string) (modules: CompiledModule seq) =
         use writer = new StreamWriter(fileName)
         for m in modules do
-            fprintfn writer "CST parse result for %s:" fileName
+            fprintfn writer "CST parse result for %s:" m.fileName
             fprintfn writer "%A" m.cst
             fprintfn writer ""
 
     let writeAstOutput (fileName: string) (modules: CompiledModule seq) =
         use writer = new StreamWriter(fileName)
         for m in modules do
-            fprintfn writer "AST parse result for %s:" fileName
+            fprintfn writer "AST parse result for %s:" m.fileName
             fprintfn writer "%A" m.ast
             fprintfn writer ""
 
     let writeAstWithTypesOutput (fileName: string) (modules: CompiledModule seq) =
         use writer = new StreamWriter(fileName)
         for m in modules do
-            fprintfn writer "Mark types result for %s:" fileName
+            fprintfn writer "Mark types result for %s:" m.fileName
             fprintfn writer "%A" m.astWithTypes
             fprintfn writer ""
 
+    let writeCodeTreeOutput (fileName: string) (codeTree: CodeTree.ExeProject) =
+        use writer = new StreamWriter(fileName)
+        fprintfn writer "Code tree:"
+        fprintfn writer "%A" codeTree
+
     let runCompiler (config: Config) =
         let modules = List.map compileModule config.inputs
-
+        let codeTree : CodeTree.ExeProject =
+          { modules = ImmutableArray<CodeTree.Module>.Empty
+            entryPoint = CodeTree.ModuleGlobal (moduleName="", index=0) }
         match config.lexerOutput with
         | Some fileName -> writeLexerOutput fileName modules
         | _ -> ()
@@ -86,6 +96,10 @@ module Drive =
 
         match config.astWithTypesOutput with
         | Some fileName -> writeAstWithTypesOutput fileName modules
+        | _ -> ()
+
+        match config.codeTreeOutput with
+        | Some fileName -> writeCodeTreeOutput fileName codeTree
         | _ -> ()
 
         match config.exeOutput with
