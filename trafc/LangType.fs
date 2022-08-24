@@ -26,10 +26,9 @@ module LangType =
         | IntVal of int64
         | ByteStringVal of string
 
-    type AstWithTypes = Ast.TopLevel<unit, unit, unit, Type * Value, Type>
-
-
 module ContextType =
+
+    open LangType
 
     type SymbolClass =
         | Variable
@@ -60,3 +59,5 @@ module ContextType =
         { frames: ContextFrame list
           typeFrames: TypeContextFrame list
         }
+
+    type AstWithTypes = Ast.TopLevel<Context, Option<Context>, Option<Type>, Type * Value, Type>

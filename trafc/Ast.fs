@@ -230,14 +230,14 @@ module AstTransform =
 
         abstract member defFunBody: context: 'moduleContext -> source: 'sourceDef -> 'funContext
         abstract member defFunType: context: 'moduleContext -> source: 'sourceDef -> 'typeContext
-        abstract member defFun: name: string -> type_: 'targetType -> attrs: FunAttrs -> statements: 'targetStmt list -> context: 'moduleContext -> source: 'sourceDef -> 'moduleContext * 'targetDef
+        abstract member defFun: name: string -> type_: 'targetType -> attrs: FunAttrs -> statements: 'targetStmt list -> childContext: 'funContext -> context: 'moduleContext -> source: 'sourceDef -> 'moduleContext * 'targetDef
 
         abstract member defExternFunType: context: 'moduleContext -> source: 'sourceDef -> 'typeContext
         abstract member defExternFun: name: string -> type_: 'targetType -> attrs: ExternFunAttrs -> context: 'moduleContext -> source: 'sourceDef -> 'moduleContext * 'targetDef
 
         // Module
         abstract member topModuleBody: context: 'topLevelContext -> source: 'sourceModule -> 'moduleContext
-        abstract member topModule: name: string -> definitions: 'targetDef list -> context: 'topLevelContext -> source: 'sourceModule -> 'topLevelContext * 'targetModule
+        abstract member topModule: name: string -> definitions: 'targetDef list -> childContext: 'moduleContext -> context: 'topLevelContext -> source: 'sourceModule -> 'topLevelContext * 'targetModule
 
     let visitAst<'sourceModule, 'sourceDef, 'sourceStmt, 'sourceExpr, 'sourceType,
                  'targetModule, 'targetDef, 'targetStmt, 'targetExpr, 'targetType,
@@ -261,15 +261,15 @@ module AstTransform =
                 let childContext = visitor.exprAddressOfChild context source
                 let arg = toExpr childContext arg
                 addressOfExpr (visitor.exprAddressOf (exprAttr arg) context source) arg
-            | Expr.Length arg -> 
+            | Expr.Length arg ->
                 let childContext = visitor.exprLengthChild context source
                 let arg = toExpr childContext arg
                 lengthExpr (visitor.exprLength (exprAttr arg) context source) arg
-            | Expr.SizeOf arg -> 
+            | Expr.SizeOf arg ->
                 let childContext = visitor.exprSizeOfChild context source
                 let arg = toExpr childContext arg
                 ExprAttr (Expr.SizeOf arg, visitor.exprSizeOf (exprAttr arg) context source)
-            | Expr.Negate arg -> 
+            | Expr.Negate arg ->
                 let childContext = visitor.exprNegateChild context source
                 let arg = toExpr childContext arg
                 negateExpr (visitor.exprNegate (exprAttr arg) context source) arg
@@ -295,7 +295,7 @@ module AstTransform =
             match typ with
             | TypeRef (name = name) ->
                 let target = visitor.typeRef name context source
-                refType target name 
+                refType target name
             | Array { type_ = typ; size = size } ->
                 let exprContext = visitor.typeArraySize context (typeAttr typ)
                 let typ = toType context typ
@@ -386,7 +386,7 @@ module AstTransform =
                 let (bodyContext, statementsRev) = List.fold toStatement (bodyContext, []) statements
                 let statements = List.rev statementsRev
                 let childAttrs = List.map stmtAttr statements
-                let (context, target) = visitor.defFun name typeAttr attrs childAttrs context source
+                let (context, target) = visitor.defFun name typeAttr attrs childAttrs bodyContext context source
                 (context, funDef target name attrs type_ statements :: acc)
             | ExternFunDefinition { name = name; type_ = type_; attrs = attrs; attr = source } ->
                 let typeContext = visitor.defExternFunType context source
@@ -398,9 +398,9 @@ module AstTransform =
         let toModule (context, acc) srcModule =
             let childContext = visitor.topModuleBody context srcModule.attr
             let (ModuleTopLevel definitions) = srcModule.definitions
-            let (childContext, deinitionsRev) = List.fold toModuleItem (childContext, []) definitions
-            let (context, targetAttr) = visitor.topModule srcModule.name [] context srcModule.attr
-            (context, (modul targetAttr srcModule.name (List.rev deinitionsRev)) :: acc)
+            let (childContext, definitionsRev) = List.fold toModuleItem (childContext, []) definitions
+            let (context, targetAttr) = visitor.topModule srcModule.name [] childContext context srcModule.attr
+            (context, (modul targetAttr srcModule.name (List.rev definitionsRev)) :: acc)
 
         let topLevel context (TopLevel modules) =
             let (context, modulesRev) = List.fold toModule (context, []) modules

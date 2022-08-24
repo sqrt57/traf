@@ -72,7 +72,7 @@ module MarkTypes =
 
     let markTypesVisitor =
         { new IAstVisitor<unit, unit, unit, unit, unit,
-                          unit, unit, unit, Type * Value, Type,
+                          Context, Option<Context>, Option<Type>, Type * Value, Type,
                           Context, Context, Context, Context, Context> with
 
             member this.typeRef name context source = (getTypeBinding context name).type_
@@ -145,10 +145,10 @@ module MarkTypes =
             member this.stmtConst name type_ ((valueType, value)) context source =
                 let valueType = getAssignmentValueType valueType
                 if not (isTypeAssignable valueType type_) then
-                    raise (TypeError (message = $"Constant {name} has type {valueType}, cannot assign value of type {type_} to it"))
+                    raise (TypeError (message = $"Constant {name} has type {type_}, cannot assign value of type {valueType} to it"))
                 let symbolInfo = { name = name; symbolClass = SymbolClass.Constant; symbolType = type_; value = value }
                 let context = addBinding symbolInfo context
-                (context, ())
+                (context, Some type_)
 
             member this.stmtVarValue context source = context
             member this.stmtVarType context source = context
@@ -157,11 +157,11 @@ module MarkTypes =
                 | Some (valueType, value) ->
                     let valueType = getAssignmentValueType valueType
                     if not (isTypeAssignable valueType type_) then
-                        raise (TypeError (message = $"Variable {name} has type {valueType}, cannot assign value of type {type_} to it"))
+                        raise (TypeError (message = $"Variable {name} has type {type_}, cannot assign value of type {valueType} to it"))
                 | None -> ()
                 let symbolInfo = { name = name; symbolClass = SymbolClass.Variable; symbolType = type_; value = NoVal }
                 let context = addBinding symbolInfo context
-                (context, ())
+                (context, Some type_)
 
             member this.stmtAssignValue context source = context
             member this.stmtAssign name ((valueType, value)) context source =
@@ -173,10 +173,10 @@ module MarkTypes =
                 let valueType = getAssignmentValueType valueType
                 if not (isTypeAssignable valueType symbolInfo.symbolType) then
                     raise (TypeError (message = $"Variable {name} has type {symbolInfo.symbolType}, cannot assign value of type {valueType} to it"))
-                (context, ())
+                (context, None)
 
             member this.stmtExprValue context source = context
-            member this.stmtExpr value context source = (context, ())
+            member this.stmtExpr value context source = (context, None)
 
             // Definition
             member this.defConstValue context source = context
@@ -187,7 +187,7 @@ module MarkTypes =
                     raise (TypeError (message = $"Constant {name} has type {valueType}, cannot assign value of type {type_} to it"))
                 let symbolInfo = { name = name; symbolClass = SymbolClass.Constant; symbolType = type_; value = value }
                 let context = addBinding symbolInfo context
-                (context, ())
+                (context, None)
 
             member this.defVarValue context source = context
             member this.defVarType context source = context
@@ -200,24 +200,24 @@ module MarkTypes =
                 | None -> ()
                 let symbolInfo = { name = name; symbolClass = SymbolClass.Variable; symbolType = type_; value = NoVal }
                 let context = addBinding symbolInfo context
-                (context, ())
+                (context, None)
 
             member this.defFunBody context source = context |> pushEmptyFrame
             member this.defFunType context source = context
-            member this.defFun name type_ attrs statements context source =
+            member this.defFun name type_ attrs statements bodyContext context source =
                 let symbolInfo = { name = name; symbolClass = SymbolClass.Function; symbolType = type_; value = NoVal }
                 let context = addBinding symbolInfo context
-                (context, ())
+                (context, Some bodyContext)
 
             member this.defExternFunType context source = context
             member this.defExternFun name type_ attrs context source =
                 let symbolInfo = { name = name; symbolClass = SymbolClass.Function; symbolType = type_; value = NoVal }
                 let context = addBinding symbolInfo context
-                (context, ())
+                (context, None)
 
             // Module
             member this.topModuleBody context source = context |> pushEmptyFrame |> pushEmptyTypeFrame
-            member this.topModule name definitions context source = (context, ())
+            member this.topModule name definitions moduleContext context source = (context, moduleContext)
         }
 
     let addBuiltins context =
