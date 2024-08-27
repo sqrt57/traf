@@ -6,8 +6,6 @@ module AstConvert =
     open Cst
     open AstCreate
 
-    type AstEmpty = Ast.TopLevel<unit, unit, unit, unit, unit>
-
     let rec private toExpr expr =
         match expr with
         | IntVal i -> intExpr () i
@@ -119,6 +117,6 @@ module AstConvert =
         let (ModuleTopLevel definitions) = cstModule.definitions
         modul () cstModule.name (List.map toModuleItem definitions)
 
-    let private topLevel (TopLevel modules) = AstCreate.topLevel (List.map toModule modules)
+    let private topLevel (TopLevel modules) = topLevel (List.map toModule modules)
 
-    let convert (cst: TopLevel) : Ast.TopLevel<unit, unit, unit, unit, unit> = topLevel cst
+    let convert (cst: TopLevel) : Ast.TopLevel = topLevel cst

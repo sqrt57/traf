@@ -25,8 +25,8 @@ module Drive =
           contents: string
           lexemes: Lexeme.Lexeme list
           cst: Cst.TopLevel
-          ast: AstConvert.AstEmpty
-          astWithTypes: ContextType.AstWithTypes }
+          ast: Ast.TopLevel
+          astWithTypes: Ast.TopLevel }
 
     let compileModule fileName =
 

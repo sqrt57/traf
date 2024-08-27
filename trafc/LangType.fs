@@ -59,5 +59,3 @@ module ContextType =
         { frames: ContextFrame list
           typeFrames: TypeContextFrame list
         }
-
-    type AstWithTypes = Ast.TopLevel<Context, Option<Context>, Option<Type>, Type * Value, Type>
