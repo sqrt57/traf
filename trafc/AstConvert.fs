@@ -60,16 +60,16 @@ module AstConvert =
             foldAttrLists func acc (AttrLists restLists)
         | [] -> acc
 
-    let private fromFunAttr (attrs: Ast.FunAttrs) name value =
+    let private fromFunAttr (attrs: Ast.FunAttributes) name value =
         match name, value with
         | "entry", NoneValue ->
             match attrs.entry with
-            | false -> { entry = true } : Ast.FunAttrs
+            | false -> { entry = true } : Ast.FunAttributes
             | true -> raise (AstConvertError {| message = "duplicate entry function attribute" |})
         | "entry", _ -> raise (AstConvertError {| message = "entry function attribute should have no value" |})
         | a, _ -> raise (AstConvertError {| message = $"illegal function attribute: {a}" |})
 
-    let private fromExternFunAttr (attrs: Ast.ExternFunAttrs) name value =
+    let private fromExternFunAttr (attrs: Ast.ExternFunAttributes) name value =
         match name, value with
         | "dll_import", String s ->
             match attrs.dll_import with
@@ -92,7 +92,7 @@ module AstConvert =
             type_ = type_
             body = FunBody body
             attributes = attributes }: FunDefinition) =
-        let initial: Ast.FunAttrs = { entry = false }
+        let initial: Ast.FunAttributes = { entry = false }
         let attrs = foldAttrLists fromFunAttr initial attributes
         funDef () name attrs (toFunType type_) (List.map toFunBodyItem body)
 
@@ -100,7 +100,7 @@ module AstConvert =
         ( { name = name
             type_ = type_
             attributes = attributes }: ExternFunDefinition) =
-        let initial : Ast.ExternFunAttrs = { dll_import = None; dll_entry_point_name = None; dll_entry_point_ordinal = None }
+        let initial : Ast.ExternFunAttributes = { dll_import = None; dll_entry_point_name = None; dll_entry_point_ordinal = None }
         let attrs = foldAttrLists fromExternFunAttr initial attributes
         externFunDef () name attrs (toFunType type_)
 
