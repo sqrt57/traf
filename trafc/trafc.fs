@@ -88,10 +88,12 @@ module Trafc =
                 eprintfn "  trafc -o output input1 [input2] ..."
                 eprintfn ""
                 eprintfn "Other options:"
-                eprintfn "  -o      FILE : write resulting executable to FILE"
-                eprintfn "  --lexer FILE : write lexer output to FILE"
-                eprintfn "  --cst   FILE : write CST parser output to FILE"
-                eprintfn "  --ast   FILE : write AST parser output to FILE"
+                eprintfn "  -o          FILE : write resulting executable to FILE"
+                eprintfn "  --lexer     FILE : write lexer output to FILE"
+                eprintfn "  --cst       FILE : write CST parser output to FILE"
+                eprintfn "  --ast       FILE : write AST parser output to FILE"
+                eprintfn "  --ast-types FILE : write type mark output to FILE"
+                eprintfn "  --code-tree FILE : write code tree to FILE"
                 1
             | LexerError err ->
                 eprintfn "Error while lexing: %s" err.message
