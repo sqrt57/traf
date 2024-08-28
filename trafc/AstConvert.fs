@@ -115,7 +115,7 @@ module AstConvert =
 
     let private toModule (cstModule: Module) =
         let (ModuleTopLevel definitions) = cstModule.definitions
-        modul () cstModule.name (List.map toModuleItem definitions)
+        module_ () cstModule.name (List.map toModuleItem definitions)
 
     let private topLevel (TopLevel modules) = topLevel (List.map toModule modules)
 
