@@ -19,6 +19,7 @@ module LangType =
         | Array of typ: Type * size: int option
         | Tuple of (string option * Type) list
         | Fun of args: Type * result: Type
+        | Reference of string
 
     type Value =
         | NoVal
@@ -27,8 +28,6 @@ module LangType =
         | ByteStringVal of string
 
 module ContextType =
-
-    open LangType
 
     type SymbolClass =
         | Variable

@@ -70,155 +70,35 @@ module MarkTypes =
         | (SomeInt, UInt32) -> true
         | _ -> false
 
-    let markTypesVisitor =
-        { new IAstVisitor<unit, unit, unit, unit, unit,
-                          Context, Option<Context>, Option<Type>, Type * Value, Type,
-                          Context, Context, Context, Context, Context> with
-
-            member this.typeRef name context source = (getTypeBinding context name).type_
-            member this.typeArraySize context source = context
-            member this.typeArray arg size context source =
-                match size with
-                | None -> Array (typ = arg, size = None)
-                | Some (_, IntVal value) -> Array (typ = arg, size = Some (int value))
-                | _ -> raise (TypeError "Array size should be an integer constant")
-            member this.typePointer arg context source = PointerTo arg
-            member this.typeFun args result context source = Fun (args = Tuple args, result = Tuple result)
-            member this.typeFunDef args result context source = Fun (args = Tuple args, result = Tuple result)
-
-            member this.exprIntVal value context source = (SomeInt, IntVal value)
-            member this.exprCharVal value context source = (UInt8, NoVal)
-            member this.exprBoolVal value context source = (Bool, BoolVal value)
-            member this.exprStringVal value context source = (ByteString, ByteStringVal value)
-            member this.exprReference name context source =
-                let symbolInfo = getBinding context name
-                (symbolInfo.symbolType, symbolInfo.value)
-            member this.exprNull context source = (AnyPointer, NoVal)
-
-            member this.exprLengthChild context source = context
-            member this.exprLength arg context source =
-                match arg with
-                | (ByteString, ByteStringVal value) -> (SomeInt, value |> String.length |> int64 |> IntVal)
-                | (ByteString, _) -> (SomeInt, NoVal)
-                | _ -> raise (TypeError (message = "Length argument should be byte string"))
-
-            member this.exprSizeOfChild context source = context
-            member this.exprSizeOf arg context source = raise (System.NotImplementedException())
-
-            member this.exprAddressOfChild context source = context
-            member this.exprAddressOf arg context source =
-                match arg with
-                | (ByteString, _) -> (PointerTo UInt8, NoVal)
-                | (t, _) -> (PointerTo t, NoVal)
-
-            member this.exprNegateChild context source = context
-            member this.exprNegate arg context source =
-                match arg with
-                | (SomeInt, IntVal value) -> (SomeInt, IntVal (-value))
-                | (SomeInt, _) -> (SomeInt, NoVal)
-                | _ -> raise (TypeError (message = "Unary negation can be only applied to integers"))
-
-            member this.exprFunCallChild context source = context
-            member this.exprFunCall func args context source =
-                match func with
-                | (Fun (args = funArgs; result = result), _) ->
-                    match funArgs with
-                    | Tuple funArgs ->
-                        let funArgs = List.map (fun (_, t) -> t) funArgs
-                        let args = List.map (fun (t, _) -> t) args
-                        if List.length funArgs <> List.length args then
-                            raise (TypeError (message = $"Function expects {List.length funArgs} arguments but got {List.length args}"))
-                        let checkArg i funArg arg =
-                            if not (isTypeAssignable arg funArg) then
-                                raise (TypeError (message = $"Function expects {funArg} at position {i+1} but got {arg}"))
-                        List.iteri2 checkArg funArgs args
-                        (result, NoVal)
-                    | _ -> raise (TypeError (message = "Function can be applied only to arguments list"))
-                | _ -> raise (TypeError (message = "Only function can be applied to arguments"))
-
-            member this.exprOperatorChild context source = context
-            member this.exprOperator left op right context source = raise (System.NotImplementedException())
-
-            // Statement
-            member this.stmtConstValue context source = context
-            member this.stmtConstType context source = context
-            member this.stmtConst name type_ ((valueType, value)) context source =
-                let valueType = getAssignmentValueType valueType
-                if not (isTypeAssignable valueType type_) then
-                    raise (TypeError (message = $"Constant {name} has type {type_}, cannot assign value of type {valueType} to it"))
-                let symbolInfo = { name = name; symbolClass = SymbolClass.Constant; symbolType = type_; value = value }
-                let context = addBinding symbolInfo context
-                (context, Some type_)
-
-            member this.stmtVarValue context source = context
-            member this.stmtVarType context source = context
-            member this.stmtVar name type_ value context source =
-                match value with
-                | Some (valueType, value) ->
-                    let valueType = getAssignmentValueType valueType
-                    if not (isTypeAssignable valueType type_) then
-                        raise (TypeError (message = $"Variable {name} has type {type_}, cannot assign value of type {valueType} to it"))
-                | None -> ()
-                let symbolInfo = { name = name; symbolClass = SymbolClass.Variable; symbolType = type_; value = NoVal }
-                let context = addBinding symbolInfo context
-                (context, Some type_)
-
-            member this.stmtAssignValue context source = context
-            member this.stmtAssign name ((valueType, value)) context source =
-                let symbolInfo = getBinding context name
-                if symbolInfo.symbolClass = Constant then
-                    raise (TypeError (message = $"Cannot assignt to constant {name}"))
-                if symbolInfo.symbolClass = Function then
-                    raise (TypeError (message = $"Cannot assignt to function {name}"))
-                let valueType = getAssignmentValueType valueType
-                if not (isTypeAssignable valueType symbolInfo.symbolType) then
-                    raise (TypeError (message = $"Variable {name} has type {symbolInfo.symbolType}, cannot assign value of type {valueType} to it"))
-                (context, None)
-
-            member this.stmtExprValue context source = context
-            member this.stmtExpr value context source = (context, None)
-
-            // Definition
-            member this.defConstValue context source = context
-            member this.defConstType context source = context
-            member this.defConst name type_ ((valueType, value)) context source =
-                let valueType = getAssignmentValueType valueType
-                if not (isTypeAssignable valueType type_) then
-                    raise (TypeError (message = $"Constant {name} has type {valueType}, cannot assign value of type {type_} to it"))
-                let symbolInfo = { name = name; symbolClass = SymbolClass.Constant; symbolType = type_; value = value }
-                let context = addBinding symbolInfo context
-                (context, None)
-
-            member this.defVarValue context source = context
-            member this.defVarType context source = context
-            member this.defVar name type_ value context source =
-                match value with
-                | Some (valueType, value) ->
-                    let valueType = getAssignmentValueType valueType
-                    if not (isTypeAssignable valueType type_) then
-                        raise (TypeError (message = $"Variable {name} has type {valueType}, cannot assign value of type {type_} to it"))
-                | None -> ()
-                let symbolInfo = { name = name; symbolClass = SymbolClass.Variable; symbolType = type_; value = NoVal }
-                let context = addBinding symbolInfo context
-                (context, None)
-
-            member this.defFunBody context source = context |> pushEmptyFrame
-            member this.defFunType context source = context
-            member this.defFun name type_ attrs statements bodyContext context source =
-                let symbolInfo = { name = name; symbolClass = SymbolClass.Function; symbolType = type_; value = NoVal }
-                let context = addBinding symbolInfo context
-                (context, Some bodyContext)
-
-            member this.defExternFunType context source = context
-            member this.defExternFun name type_ attrs context source =
-                let symbolInfo = { name = name; symbolClass = SymbolClass.Function; symbolType = type_; value = NoVal }
-                let context = addBinding symbolInfo context
-                (context, None)
-
-            // Module
-            member this.topModuleBody context source = context |> pushEmptyFrame |> pushEmptyTypeFrame
-            member this.topModule name definitions moduleContext context source = (context, moduleContext)
-        }
+    let typesAttribute =
+        { new ISynthesizedAttribute<Type> with
+            member this.defConst name type_ value attrs = failwith "todo"
+            member this.defExternFun name attributes type_ attrs = failwith "todo"
+            member this.defFun name attributes type_ statements attrs = failwith "todo"
+            member this.defVar name type_ value attrs = failwith "todo"
+            member this.exprAddressOf arg attrs = failwith "todo"
+            member this.exprBoolVal value attrs = failwith "todo"
+            member this.exprCharVal value attrs = failwith "todo"
+            member this.exprFunCall func args attrs = failwith "todo"
+            member this.exprIntVal value attrs = failwith "todo"
+            member this.exprLength arg attrs = failwith "todo"
+            member this.exprNegate arg attrs = failwith "todo"
+            member this.exprNull(attrs) = failwith "todo"
+            member this.exprOperator left op right attrs = failwith "todo"
+            member this.exprReference value attrs = failwith "todo"
+            member this.exprSizeOf arg attrs = failwith "todo"
+            member this.exprStringVal value attrs = failwith "todo"
+            member this.stmtAssign name value attrs = failwith "todo"
+            member this.stmtConst name type_ value attrs = failwith "todo"
+            member this.stmtExpr value attrs = failwith "todo"
+            member this.stmtVar name type_ value attrs = failwith "todo"
+            member this.topModule name definitions attrs = failwith "todo"
+            member this.typeArray itemType size attrs = failwith "todo"
+            member this.typeFun args result attrs = failwith "todo"
+            member this.typeFunDef args result attrs = failwith "todo"
+            member this.typePointer itemType attrs = failwith "todo"
+            member this.typeRef name attrs = failwith "todo"
+    }
 
     let addBuiltins context =
         context
@@ -235,5 +115,5 @@ module MarkTypes =
 
     let markTypes ast =
         let context = addBuiltins initialContext
-        let (context, ast) = visitAst markTypesVisitor ast context
+        let ast = calculateSynthesized typesAttribute ast
         ast

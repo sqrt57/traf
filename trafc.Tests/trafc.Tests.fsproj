@@ -9,6 +9,7 @@
   <ItemGroup>
     <Compile Include="Lex.fs" />
     <Compile Include="CstParse.fs" />
+    <Compile Include="MarkTypes.fs" />
     <Compile Include="PeCoffAllocate.fs" />
   </ItemGroup>
 

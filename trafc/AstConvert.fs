@@ -8,49 +8,49 @@ module AstConvert =
 
     let rec private toExpr expr =
         match expr with
-        | IntVal i -> intExpr () i
-        | CharVal c -> charExpr () c
-        | BoolVal b -> boolExpr () b
-        | StringVal s -> stringExpr () s
-        | Ref r -> if r = "null" then nullExpr () else refExpr () r
-        | AddressOf arg -> addressOfExpr () (toExpr arg)
-        | Negate arg -> negateExpr () (toExpr arg)
+        | IntVal i -> intExpr i
+        | CharVal c -> charExpr c
+        | BoolVal b -> boolExpr b
+        | StringVal s -> stringExpr s
+        | Ref r -> if r = "null" then nullExpr else refExpr r
+        | AddressOf arg -> addressOfExpr (toExpr arg)
+        | Negate arg -> negateExpr (toExpr arg)
         | FunCall { func = Ref "length"; arguments = [arg] } ->
-            lengthExpr () (toExpr arg)
+            lengthExpr (toExpr arg)
         | FunCall { func = Ref "length"; arguments = _ } ->
-            raise (AstConvertError {| message = "length() accepts exactly one argument" |})
+            raise (AstConvertError {| message = "lengthaccepts exactly one argument" |})
         | FunCall { func = Ref "sizeof"; arguments = [arg] } ->
-            sizeOfExpr () (toExpr arg)
+            sizeOfExpr (toExpr arg)
         | FunCall { func = Ref "sizeof"; arguments = _ } ->
-            raise (AstConvertError {| message = "sizeof() accepts exactly one argument" |})
+            raise (AstConvertError {| message = "sizeofaccepts exactly one argument" |})
         | FunCall { func = func; arguments = arguments } ->
-            funCallExpr () (toExpr func) (List.map toExpr arguments)
+            funCallExpr (toExpr func) (List.map toExpr arguments)
         | Operator { left = left; op = op; right = right } ->
-            operatorExpr () (toExpr left) op (toExpr right)
+            operatorExpr (toExpr left) op (toExpr right)
 
     let rec private toType type_ =
         match type_ with
-        | TypeRef s -> refType () s
+        | TypeRef s -> refType s
         | Array { type_ = type_; size = size } ->
-            arrayType () (toType type_) (Option.map toExpr size)
-        | Pointer type_ -> pointerType () (toType type_)
+            arrayType (toType type_) (Option.map toExpr size)
+        | Pointer type_ -> pointerType (toType type_)
         | Fun { arguments = TypeTuple arguments; result = TypeTuple result } ->
-            funType () (List.map typeTupleSlot arguments) (List.map typeTupleSlot result)
+            funType (List.map typeTupleSlot arguments) (List.map typeTupleSlot result)
         | Tuple _ -> raise (AstConvertError {| message = "type tuple is not supported" |})
     and typeTupleSlot ({ name = name; type_ = typ; }: TypeTupleSlot) = (name, (toType typ))
 
     let toFunType ({ arguments = TypeTuple arguments; result = TypeTuple result }: FunType) =
-        funDefType () (List.map typeTupleSlot arguments) (List.map typeTupleSlot result)
+        funDefType (List.map typeTupleSlot arguments) (List.map typeTupleSlot result)
 
     let private toFunBodyItem funBodyItem =
         match funBodyItem with
         | ConstStatement { name = name; type_ = type_; value = value } ->
-            constStmt () name (toType type_) (toExpr value)
+            constStmt name (toType type_) (toExpr value)
         | VarStatement { name = name; type_ = type_; value = value } ->
-            varStmt () name (toType type_) (Option.map toExpr value)
+            varStmt name (toType type_) (Option.map toExpr value)
         | Assignment { name = name; value = value } ->
-            assignStmt () name (toExpr value)
-        | Expression expr -> exprStmt () (toExpr expr)
+            assignStmt name (toExpr value)
+        | Expression expr -> exprStmt (toExpr expr)
 
     let rec private foldAttrLists func acc (AttrLists attrLists)  =
         match attrLists with
@@ -94,7 +94,7 @@ module AstConvert =
             attributes = attributes }: FunDefinition) =
         let initial: Ast.FunAttributes = { entry = false }
         let attrs = foldAttrLists fromFunAttr initial attributes
-        funDef () name attrs (toFunType type_) (List.map toFunBodyItem body)
+        funDef name attrs (toFunType type_) (List.map toFunBodyItem body)
 
     let private toExternFun
         ( { name = name
@@ -102,21 +102,21 @@ module AstConvert =
             attributes = attributes }: ExternFunDefinition) =
         let initial : Ast.ExternFunAttributes = { dll_import = None; dll_entry_point_name = None; dll_entry_point_ordinal = None }
         let attrs = foldAttrLists fromExternFunAttr initial attributes
-        externFunDef () name attrs (toFunType type_)
+        externFunDef name attrs (toFunType type_)
 
     let private toModuleItem moduleItem =
         match moduleItem with
         | ConstDefinition { name = name; type_ = type_; value = value } ->
-            constDef () name (toType type_) (toExpr value)
+            constDef name (toType type_) (toExpr value)
         | VarDefinition { name = name; type_ = type_; value = value } ->
-            varDef () name (toType type_) (Option.map toExpr value)
+            varDef name (toType type_) (Option.map toExpr value)
         | FunDefinition f -> toFun f
         | ExternFunDefinition ef -> toExternFun ef
 
     let private toModule (cstModule: Module) =
         let (ModuleTopLevel definitions) = cstModule.definitions
-        module_ () cstModule.name (List.map toModuleItem definitions)
+        module_ cstModule.name (List.map toModuleItem definitions)
 
     let private topLevel (TopLevel modules) = topLevel (List.map toModule modules)
 
-    let convert (cst: TopLevel) : Ast.TopLevel = topLevel cst
+    let convert (cst: TopLevel) : Ast.TopLevelWithAttr = topLevel cst
